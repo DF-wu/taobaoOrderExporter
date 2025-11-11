@@ -1,0 +1,383 @@
+{
+  "traceId": "215046c117627012381957557e0ced",
+  "deliveryInfo": {
+    "sellerNick": "任意魔主",
+    "tspInfo": {},
+    "address": "圣天-(会员名称：黄芷琳11)，86-15013871001，广东省 东莞市 洪梅镇 广东省东莞市洪梅镇商业街62号A区 -(入库编号：105233) ，000000",
+    "privacytPhoneHasExpired": 0,
+    "companyUrl": "http://www.yto.net.cn/cn/index/index.html",
+    "showTSP": false,
+    "arriveTime": "",
+    "logisticsName": "圆通速递",
+    "usePrivacytPhone": 0,
+    "showLogistics": true,
+    "shipType": "快递",
+    "logisticsNum": "YT7582835343069",
+    "asyncLogisticsUrl": "//detail.i56.taobao.com/call/queryTrace.do?dimension=TRADE_ID&tradeId=4863471516469004803"
+  },
+  "mainOrder": {
+    "seller": {
+      "nick": "任意魔主",
+      "opeanSearch": false,
+      "wangwangType": "wangwang",
+      "mail": "q***",
+      "phoneNum": "0518-****7252-",
+      "shopDisable": false,
+      "id": 1097730455,
+      "guestUser": false,
+      "alipayAccount": "q***",
+      "notShowSellerInfo": false,
+      "alertStyle": 0
+    },
+    "statusInfo": {
+      "text": "当前订单状态：卖家已发货，请查看页面下方物流信息了解宝贝寄送情况",
+      "type": "t0"
+    },
+    "bizCode": "ali.china.taobao.beauty",
+    "columns": [
+      "宝贝",
+      "宝贝属性",
+      "状态",
+      "服务",
+      "数量/单价"
+    ],
+    "subOrders": [
+      {
+        "idStr": "4863471516469004803",
+        "priceInfo": "￥9.90",
+        "quantity": "10",
+        "service": [],
+        "extra": {
+          "overSold": false,
+          "alicommunOrderDirect": false,
+          "needShowQuantity": 0,
+          "xt": false,
+          "needDisplay": false,
+          "payStatus": 0,
+          "opWeiQuan": false,
+          "notSupportReturn": false
+        },
+        "tradeStatus": [
+          {
+            "type": "line",
+            "content": [
+              {
+                "type": "text",
+                "value": "未确认收货"
+              }
+            ]
+          }
+        ],
+        "id": 4863471516469005000,
+        "itemInfo": {
+          "skuText": [
+            {
+              "type": "line",
+              "content": [
+                {
+                  "type": "namevalue",
+                  "value": {
+                    "name": "颜色分类：",
+                    "value": "花色",
+                    "type": "text"
+                  }
+                },
+                {
+                  "type": "namevalue",
+                  "value": {
+                    "name": "大小：",
+                    "value": "均码",
+                    "type": "text"
+                  }
+                }
+              ]
+            }
+          ],
+          "auctionUrl": "//trade.taobao.com/trade/detail/tradeSnap.htm?trade_id=4863471516469004803",
+          "extra": [
+            {
+              "visible": "SOLID",
+              "highLight": true,
+              "name": "发货时间：",
+              "value": "11月08日 23:10前发货"
+            }
+          ],
+          "pic": "//img.alicdn.com/imgextra/i4/1097730455/O1CN01nt4l9B1FERJGClb1N_!!1097730455.jpg_sum.jpg",
+          "title": "手工穿戴甲十宠一链接",
+          "serviceIcons": [
+            {
+              "linkTitle": "保障卡",
+              "linkUrl": "http://trade.taobao.com/trade/security/security_card.htm?bizOrderId=4863471516469004803",
+              "type": 3,
+              "url": "//img.alicdn.com/tps/i2/T1S4ysXh8pXXXXXXXX-52-16.png"
+            }
+          ],
+          "skuId": 0
+        }
+      }
+    ],
+    "operations": [],
+    "wirelessOrderInfo": {
+      "showConsignTime": true
+    },
+    "extra": {
+      "unionTitle": true,
+      "inHold": false,
+      "isShowSellerService": false
+    },
+    "tradeStatus": "WAIT_BUYER_CONFIRM_GOODS",
+    "orderInfo": {
+      "lines": [
+        {
+          "type": "line",
+          "content": []
+        },
+        {
+          "type": "line",
+          "content": [
+            {
+              "type": "namevalue",
+              "value": {
+                "name": "订单编号:",
+                "value": [
+                  {
+                    "type": "text",
+                    "value": "4863471516469004803"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "namevalue",
+              "value": {
+                "name": "支付宝交易号:",
+                "value": "2025110622001159201403696346",
+                "type": "text"
+              }
+            },
+            {
+              "type": "namevalue",
+              "value": {
+                "name": "创建时间:",
+                "value": "2025-11-06 23:08:55",
+                "type": "text"
+              }
+            },
+            {
+              "type": "namevalue",
+              "value": {
+                "name": "付款时间:",
+                "value": "2025-11-06 23:09:33",
+                "type": "text"
+              }
+            }
+          ]
+        }
+      ],
+      "type": "group"
+    },
+    "id": "4863471516469004803",
+    "payInfo": {
+      "showPayDetail": false,
+      "feeMess": [
+        {
+          "visible": "SOLID",
+          "name": "商品总价",
+          "value": "￥99.00"
+        },
+        {
+          "visible": "SOLID",
+          "name": "运费",
+          "value": "￥0.00"
+        }
+      ],
+      "cod": false,
+      "sendPromotions": [],
+      "actualFee": {
+        "visible": "SOLID",
+        "highLight": true,
+        "name": "实付款",
+        "value": "￥99.00"
+      },
+      "fullPromotion": {
+        "valid": false
+      }
+    },
+    "presentOrder": false
+  },
+  "buyMessage": "A882-付32發35",
+  "orderBar": {
+    "nodes": [
+      {
+        "date": "2025-11-06 23:08:55",
+        "index": 1,
+        "text": "拍下宝贝"
+      },
+      {
+        "date": "2025-11-06 23:09:33",
+        "index": 2,
+        "text": "付款到支付宝"
+      },
+      {
+        "date": "2025-11-07 12:39:38",
+        "index": 3,
+        "text": "卖家发货"
+      },
+      {
+        "index": 4,
+        "text": "确认收货"
+      }
+    ],
+    "currentStepIndex": 0,
+    "currentIndex": 3
+  },
+  "crumbs": [
+    {
+      "text": "首页",
+      "url": "//www.taobao.com"
+    },
+    {
+      "text": "我的淘宝",
+      "url": "//i.taobao.com/myTaobao.htm?nekot=1762701238275"
+    },
+    {
+      "text": "已买到的宝贝",
+      "url": "//trade.taobao.com/trade/itemlist/listBoughtItems.htm?nekot=1762701238275"
+    }
+  ],
+  "operationsGuide": [
+    {
+      "layout": "li",
+      "lines": [
+        {
+          "type": "line",
+          "content": [
+            {
+              "type": "text",
+              "value": "您还有 "
+            },
+            {
+              "type": "countdown",
+              "value": {
+                "hour": 13,
+                "countDown": 653139,
+                "day": 7,
+                "minute": 25,
+                "second": 39
+              }
+            },
+            {
+              "type": "text",
+              "value": "来完成宝贝"
+            },
+            {
+              "type": "operation",
+              "value": {
+                "style": "t16",
+                "text": "手工穿戴甲十宠一链接",
+                "type": "operation"
+              }
+            },
+            {
+              "type": "text",
+              "value": " 的\"确认收货\"操作。"
+            },
+            {
+              "type": "text",
+              "value": "如果期间您没有\"确认收货\"，也没有\"申请退款\"，以上宝贝将自动确认收货，支付宝将把货款支付给卖家（任意魔主）。"
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "content": [
+            {
+              "type": "text",
+              "value": "如果您已收到货，且对商品满意，您可以"
+            },
+            {
+              "type": "operation",
+              "value": {
+                "style": "t3",
+                "text": "确认收货",
+                "type": "operation",
+                "url": "//trade.taobao.com/trade/confirmGoods.htm?bizOrderId=4863471516469004803"
+              }
+            },
+            {
+              "type": "text",
+              "value": "打款给卖家"
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "content": [
+            {
+              "type": "text",
+              "value": "如果还未收到货，请注意自动打款时间，您可以"
+            },
+            {
+              "type": "operation",
+              "value": {
+                "dataUrl": "/trade/buyerDelayConfirmGoodsTime.htm?biz_order_id=4863471516469004803&biz_type=200&has_refund=true&cell_redirect=0",
+                "data": {
+                  "width": 600,
+                  "crossOrigin": false,
+                  "height": 220
+                },
+                "action": "a8",
+                "style": "t16",
+                "text": "延长收货时间",
+                "type": "operation"
+              }
+            },
+            {
+              "type": "text",
+              "value": "或"
+            },
+            {
+              "type": "operation",
+              "value": {
+                "style": "t0",
+                "text": "申请退款",
+                "type": "operation",
+                "url": "//refund2.taobao.com/dispute/applyRouter.htm?bizOrderId=4863471516469004803"
+              }
+            }
+          ]
+        }
+      ],
+      "type": "group"
+    }
+  ],
+  "customService": {
+    "display": "orangeText",
+    "type": "line",
+    "content": [
+      {
+        "type": "text",
+        "value": "有疑问可咨询:人工客服"
+      }
+    ]
+  },
+  "detailExtra": {
+    "op": false,
+    "ccc": false,
+    "sellerMemoInfo": {
+      "flagPic": "https://img.alicdn.com/imgextra/i2/O1CN01k51piZ1htTu279fNe_!!6000000004335-2-tps-120-120.png?getAvatar=avatar",
+      "memo": "882",
+      "flagId": 0
+    },
+    "refundByTb": false,
+    "inRefund": false,
+    "enableTmallhkTaxDetail": false,
+    "b2c": false,
+    "tradeEnd": false,
+    "outShopOrder": false,
+    "wakeupOrder": false,
+    "success": false,
+    "newSellerMemo": true,
+    "viewed_flag": false
+  }
+}

@@ -1,0 +1,590 @@
+{
+    "ad": {
+        "banner": {},
+        "p4pAdvert": {
+            "params": {
+                "p4p": "true"
+            }
+        },
+        "salePromotion": {
+            "params": {
+                "aldCfgAppId": "03236",
+                "itemIds": "819225492008",
+                "aldCfgName": "vieworder_a"
+            }
+        }
+    },
+    "amount": {
+        "count": [
+            [
+                {
+                    "content": [
+                        {
+                            "data": {
+                                "money": {
+                                    "css": {
+                                        "width": "120px"
+                                    },
+                                    "text": "￥149.80",
+                                    "type": "label"
+                                },
+                                "colon": {
+                                    "text": "：",
+                                    "type": "label"
+                                },
+                                "titleLink": {
+                                    "css": {},
+                                    "text": "商品总价",
+                                    "type": "label"
+                                }
+                            },
+                            "layout": {
+                                "row1": {
+                                    "children": [
+                                        "titleLink",
+                                        "colon",
+                                        "money"
+                                    ]
+                                },
+                                "root": {
+                                    "children": [
+                                        "row1"
+                                    ]
+                                }
+                            },
+                            "root": "root",
+                            "type": "mixture"
+                        }
+                    ],
+                    "key": ""
+                },
+                {
+                    "content": [
+                        {
+                            "data": {
+                                "money": {
+                                    "css": {
+                                        "width": "120px"
+                                    },
+                                    "text": "￥0.00",
+                                    "type": "label"
+                                },
+                                "colon": {
+                                    "text": "：",
+                                    "type": "label"
+                                },
+                                "titleLink": {
+                                    "css": {},
+                                    "text": "运费(快递)",
+                                    "type": "label"
+                                }
+                            },
+                            "layout": {
+                                "row1": {
+                                    "children": [
+                                        "titleLink",
+                                        "colon",
+                                        "money"
+                                    ]
+                                },
+                                "root": {
+                                    "children": [
+                                        "row1"
+                                    ]
+                                }
+                            },
+                            "root": "root",
+                            "type": "mixture"
+                        }
+                    ],
+                    "key": ""
+                },
+                {
+                    "content": [
+                        {
+                            "data": {
+                                "money": {
+                                    "css": {
+                                        "width": "120px"
+                                    },
+                                    "text": "-￥23.00",
+                                    "type": "label"
+                                },
+                                "colon": {
+                                    "text": "：",
+                                    "type": "label"
+                                },
+                                "titleLink": {
+                                    "css": {},
+                                    "text": "官方立减",
+                                    "type": "label"
+                                }
+                            },
+                            "layout": {
+                                "row1": {
+                                    "children": [
+                                        "titleLink",
+                                        "colon",
+                                        "money"
+                                    ]
+                                },
+                                "root": {
+                                    "children": [
+                                        "row1"
+                                    ]
+                                }
+                            },
+                            "root": "root",
+                            "type": "mixture"
+                        }
+                    ],
+                    "key": ""
+                },
+                {
+                    "content": [
+                        {
+                            "data": {
+                                "money": {
+                                    "css": {
+                                        "color": "#DD2727",
+                                        "fontSize": "14px",
+                                        "fontWeight": "600",
+                                        "width": "120px"
+                                    },
+                                    "text": "￥126.80",
+                                    "type": "label"
+                                },
+                                "colon": {
+                                    "text": "：",
+                                    "type": "label"
+                                },
+                                "titleLink": {
+                                    "css": {
+                                        "color": "#333333",
+                                        "fontSize": "14px",
+                                        "fontWeight": "600"
+                                    },
+                                    "text": "实付款",
+                                    "type": "label"
+                                }
+                            },
+                            "layout": {
+                                "row1": {
+                                    "children": [
+                                        "titleLink",
+                                        "colon",
+                                        "money"
+                                    ]
+                                },
+                                "root": {
+                                    "children": [
+                                        "row1"
+                                    ]
+                                }
+                            },
+                            "root": "root",
+                            "type": "mixture"
+                        }
+                    ],
+                    "key": ""
+                }
+            ]
+        ],
+        "priceDetailBuilder": {},
+        "promotion": [
+            {
+                "content": [
+                    {
+                        "data": {
+                            "money": {
+                                "css": {
+                                    "width": "120px"
+                                },
+                                "text": "返积分12点",
+                                "type": "label"
+                            }
+                        },
+                        "layout": {
+                            "row1": {
+                                "children": [
+                                    "money"
+                                ]
+                            },
+                            "root": {
+                                "children": [
+                                    "row1"
+                                ]
+                            }
+                        },
+                        "root": "root",
+                        "type": "mixture"
+                    }
+                ],
+                "key": ""
+            }
+        ]
+    },
+    "basic": {
+        "lists": [
+            {
+                "content": [
+                    {
+                        "text": "圣天-(会员名称：黄芷琳11),18466143756-2472,广东省 东莞市 洪梅镇 广东省东莞市洪梅镇商业街62号A区 -(入库编号：105233) ,000000",
+                        "type": "label"
+                    }
+                ],
+                "key": "收货地址"
+            },
+            {
+                "content": [
+                    {
+                        "text": "-",
+                        "type": "label"
+                    }
+                ],
+                "key": "买家留言"
+            },
+            {
+                "content": [
+                    {
+                        "text": "4864583305858004803",
+                        "type": "label"
+                    },
+                    {
+                        "direction": "left",
+                        "moreList": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "2025110722001159201411668682",
+                                        "type": "label"
+                                    }
+                                ],
+                                "key": "支付宝交易号"
+                            },
+                            {
+                                "content": [
+                                    {
+                                        "text": "2025-11-07 14:42:42",
+                                        "type": "label"
+                                    }
+                                ],
+                                "key": "成交时间"
+                            },
+                            {
+                                "content": [
+                                    {
+                                        "text": "2025-11-07 14:42:51",
+                                        "type": "label"
+                                    }
+                                ],
+                                "key": "付款时间"
+                            },
+                            {
+                                "content": [
+                                    {
+                                        "text": "2025-11-07 15:34:47",
+                                        "type": "label"
+                                    }
+                                ],
+                                "key": "发货时间"
+                            }
+                        ],
+                        "noHover": false,
+                        "text": "更多",
+                        "type": "more"
+                    }
+                ],
+                "key": "订单编号"
+            },
+            {
+                "content": [
+                    {
+                        "text": "<span class='short-dd-nick' title='3**'>3**<span class='J_WangWang' data-nick='3dsway旗舰店' data-icon='small' data-item='0:4864583305858004803' data-encode='true' data-display='inline' data-encryptuid='RAzN8HWSrSLxyp2jVHsLKnzHaYL4vqeDpr3gRF2uwPwSuD4MA92' data-bizdomain='taobao' data-biztype='0' data-sceneparam=%7B%22toRole%22%3A%22%22%2C%22bizRef%22%3A%22qianniuTpRefund%22%7D></span></span>",
+                        "type": "html"
+                    },
+                    {
+                        "direction": "left",
+                        "moreList": [
+                            {
+                                "content": [
+                                    {
+                                        "type": "label"
+                                    }
+                                ],
+                                "key": "真实姓名"
+                            },
+                            {
+                                "content": [
+                                    {
+                                        "type": "label"
+                                    }
+                                ],
+                                "key": "城市"
+                            }
+                        ],
+                        "noHover": false,
+                        "text": "更多",
+                        "type": "more"
+                    }
+                ],
+                "key": "商家"
+            }
+        ],
+        "log": {},
+        "title": "订单信息"
+    },
+    "bizCode": "ali.china.tmall.appliance",
+    "orders": {
+        "id": 4864583305858005000,
+        "list": [
+            {
+                "logistic": {
+                    "content": [
+                        {
+                            "companyName": "圆通速递",
+                            "mailNo": "YT7582890600202",
+                            "text": "包裹1",
+                            "type": "logistic",
+                            "url": "//detail.i56.taobao.com/call/query_trace_un_login.do?tradeId=4864583305858004803&dimension=TRADE_ID&appName=TMALL_BUY&digest=nFnRDhBr7TtYO1L8Wngx4w%3D%3D&data-mail-no=YT7582890600202&data-company-name=圆通速递"
+                        }
+                    ],
+                    "key": ""
+                },
+                "status": [
+                    {
+                        "statusInfo": [
+                            {
+                                "text": "待确认收货",
+                                "type": "label"
+                            },
+                            {
+                                "serverTime": "1762844132387",
+                                "targetTime": "1763364887000",
+                                "type": "countdown"
+                            }
+                        ],
+                        "subOrders": [
+                            {
+                                "itemInfo": {
+                                    "auctionUrl": "//detail.tmall.com/item.htm?id=819225492008",
+                                    "extra": [
+                                        {
+                                            "name": "商家编码",
+                                            "value": "四盘3D打印耗材干燥箱",
+                                            "visible": "SOLID"
+                                        }
+                                    ],
+                                    "itemUrl": "//trade.taobao.com/trade/detail/tradeSnap.htm?tradeID=4864583305858004803",
+                                    "pic": "//img.alicdn.com/imgextra/i2/2211900559174/O1CN01J5OdOj2HdkX3L9OSn_!!2211900559174.jpg",
+                                    "serviceIcons": [
+                                        {
+                                            "linkTitle": "正品保证",
+                                            "linkUrl": "//rule.tmall.com/tdetail-4400.htm",
+                                            "name": "正品保证",
+                                            "title": "正品保证",
+                                            "type": 3,
+                                            "url": "//img.alicdn.com/tps/i2/T1SyeXFpliXXaSQP_X-16-16.png"
+                                        },
+                                        {
+                                            "linkTitle": "如实描述",
+                                            "linkUrl": "//www.taobao.com/go/act/315/xfzbz_rsms.php?ad_id=&am_id=130011830696bce9eda3&cm_id=&pm_id=",
+                                            "name": "如实描述",
+                                            "title": "如实描述",
+                                            "type": 3,
+                                            "url": "//img.alicdn.com/tps/TB1PDB6IVXXXXaVaXXXXXXXXXXX.png"
+                                        },
+                                        {
+                                            "linkTitle": "七天退换",
+                                            "linkUrl": "//pages.tmall.com/wow/seller/act/seven-day",
+                                            "name": "七天退换",
+                                            "title": "七天退换",
+                                            "type": 3,
+                                            "url": "//img.alicdn.com/tps/i3/T1Vyl6FCBlXXaSQP_X-16-16.png"
+                                        },
+                                        {
+                                            "linkTitle": "价保期 2025-11-07 14:42:51 到 2025-11-29 23:59:59",
+                                            "linkUrl": "//pages.tmall.com/wow/act/22351/priceprotection?wh_biz=tm",
+                                            "name": "价保",
+                                            "title": "价保",
+                                            "type": 3,
+                                            "url": "//img.alicdn.com/imgextra/i4/O1CN01JXwSMv1XQwvhbP5dZ_!!6000000002919-2-tps-16-16.png"
+                                        }
+                                    ],
+                                    "skuText": [
+                                        {
+                                            "content": [
+                                                {
+                                                    "text": "【打印件+注塑件】四盘装3D打印耗材干燥盒",
+                                                    "type": "label"
+                                                }
+                                            ],
+                                            "key": "颜色分类"
+                                        }
+                                    ],
+                                    "snapUrl": "//trade.taobao.com/trade/detail/tradeSnap.htm?tradeID=4864583305858004803",
+                                    "title": "【优惠价】三迪思维3DSWAY 四盘3D打印耗材干燥箱 pla耗材防尘防潮密封干燥盒1kg料盘多少多卷可用 拓t竹A"
+                                },
+                                "priceInfo": [
+                                    {
+                                        "text": "￥149.80",
+                                        "type": "label"
+                                    }
+                                ],
+                                "quantity": "1"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "other": {
+        "content": []
+    },
+    "overStatus": {
+        "explain": [],
+        "operate": [
+            {
+                "content": [
+                    {
+                        "action": "b5",
+                        "id": "CONFIRM_GOODS",
+                        "pointUrl": "//go.mmstat.com/jsclick?logtyp=2&orderdetail=confirm",
+                        "text": "确认收货",
+                        "type": "operation",
+                        "url": "//trade.tmall.com/order/confirmGoods.htm?biz_order_id=4864583305858004803"
+                    },
+                    {
+                        "action": "b1",
+                        "data": {
+                            "body": "",
+                            "crossOrigin": false,
+                            "height": 250,
+                            "title": "延长收货时间",
+                            "width": 690
+                        },
+                        "dataUrl": "//trade.tmall.com/order/buyer_delay_confirm_goods_time.htm?biz_order_id=4864583305858004803&has_refund=false&is_neu=true",
+                        "id": "BUYER_DELAY_CONFIRM",
+                        "pointUrl": "//go.mmstat.com/jsclick?logtyp=2&buyer=delay",
+                        "text": "延长收货时间",
+                        "type": "operation"
+                    },
+                    {
+                        "action": "b4",
+                        "id": "ADD_BUYER_MEMO",
+                        "pointUrl": "//go.mmstat.com/jsclick?logtyp=2&orderdetail=viewdetail",
+                        "text": "备忘",
+                        "type": "operation",
+                        "url": "//trade.taobao.com/trade/memo/update_buy_memo.htm?biz_order_id=4864583305858004803&buyer_id=2216935000348&return_url=%2F%2Ftrade.tmall.com%2Fdetail%2ForderDetail.htm%3Fbiz_order_id%3D4864583305858004803"
+                    },
+                    {
+                        "action": "b4",
+                        "id": "applyInvoice",
+                        "text": "申请开票",
+                        "type": "operation",
+                        "url": "//invoice-ua.taobao.com/user/invoice/applyPcRoute?orderId=4864583305858004803"
+                    }
+                ],
+                "key": "您可以"
+            }
+        ],
+        "prompt": [
+            {
+                "content": [
+                    {
+                        "afterText": ";来确认收货,超时订单自动确认收货",
+                        "preText": "您还有",
+                        "serverTime": "1762844132387",
+                        "targetTime": "1763364887000",
+                        "type": "countdown"
+                    }
+                ],
+                "key": ""
+            },
+            {
+                "content": [
+                    {
+                        "text": "预计11月08日送达",
+                        "type": "label"
+                    },
+                    {
+                        "companyName": "圆通速递",
+                        "mailNo": "YT7582890600202",
+                        "type": "logistic",
+                        "url": "//detail.i56.taobao.com/call/query_trace_un_login.do?tradeId=4864583305858004803&dimension=TRADE_ID&appName=TMALL_BUY&digest=nFnRDhBr7TtYO1L8Wngx4w%3D%3D"
+                    }
+                ],
+                "key": "配送时间"
+            }
+        ],
+        "status": {
+            "content": [
+                {
+                    "text": "<h3>订单状态: 商家已发货，等待买家确认</h3>",
+                    "type": "html"
+                }
+            ],
+            "iconUrl": "//img.alicdn.com/tps/i4/T1VVShXqtcXXamt9jd-34-34.png"
+        }
+    },
+    "stepbar": {
+        "current": 2,
+        "options": [
+            {
+                "content": "拍下商品",
+                "time": "2025-11-07 14:42:42"
+            },
+            {
+                "content": "付款到支付宝",
+                "time": "2025-11-07 14:42:51"
+            },
+            {
+                "content": "卖家发货",
+                "time": "2025-11-07 15:34:47"
+            },
+            {
+                "content": "确认收货"
+            },
+            {
+                "content": "评价"
+            }
+        ]
+    },
+    "top": {
+        "crumbs": {
+            "content": [
+                {
+                    "action": "b4",
+                    "text": "首页",
+                    "type": "operation",
+                    "url": "//www.tmall.com"
+                },
+                {
+                    "action": "b4",
+                    "text": "我的淘宝",
+                    "type": "operation",
+                    "url": "//i.taobao.com/myTaobao.htm?nekot=1762844132357"
+                },
+                {
+                    "action": "b4",
+                    "text": "已买到的宝贝",
+                    "type": "operation",
+                    "url": "//trade.taobao.com/trade/itemlist/listBoughtItems.htm?nekot=1762844132357"
+                }
+            ],
+            "key": "您的位置"
+        },
+        "hotline": {
+            "content": [
+                {
+                    "text": "4008 608 608",
+                    "type": "label"
+                }
+            ],
+            "key": "天猫热线"
+        }
+    },
+    "traceId": "0bb405a417628441322752110e0c4a",
+    "tradeStatus": "WAIT_BUYER_CONFIRM_GOODS"
+}
