@@ -1,69 +1,80 @@
-# 淘寶訂單匯出 Userscript (Kilo Code 版)
+# Taobao Order Exporter Userscript (Kilo Code Edition)
 
-[![Language](https://img.shields.io/badge/language-JavaScript-yellow.svg)](https://www.javascript.com/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+<div align="center">
 
-這是一個功能強大的 Userscript，專為需要從淘寶/天貓「已買到的寶貝」頁面批量匯出訂單資料的使用者設計。它可以抓取包括商品名稱、價格、數量、SKU、賣家資訊，甚至是**物流單號**在內的詳細資料，並將其匯出為 Excel 相容的 CSV 檔案。
+[**English**](./readme.md) | [**繁體中文**](./README_zh-Hant.md)
 
-與其他類似工具相比，本腳本特別針對淘寶複雜的前端環境進行了優化，解決了諸如**跨域請求 (CORS)**、**GBK 編碼亂碼**以及**API 風控**等常見的技術難題。
+</div>
 
-## ✨ 核心功能
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/Tampermonkey-✅-brightgreen.svg" alt="Tampermonkey Compatible">
+  <img src="https://img.shields.io/badge/Violentmonkey-✅-brightgreen.svg" alt="Violentmonkey Compatible">
+  <img src="https://img.shields.io/badge/code%20style-prettier-ff69b4.svg" alt="Code Style: Prettier">
+</p>
 
--   **一鍵抓取**：在「已買到的寶貝」頁面注入操作面板，輕鬆啟動。
--   **批量處理**：支援自訂要抓取的訂單頁碼範圍，自動翻頁。
--   **物流追蹤**：自動訪問每個訂單的詳情頁，獲取物流公司和快遞單號。
--   **本地儲存**：抓取進度會自動儲存在瀏覽器中，即使關閉頁面也不會遺失資料。
--   **智慧去重**：多次執行抓取時，能自動合併資料並移除重複的訂單記錄。
--   **Excel 友善**：匯出的 CSV 檔案包含 BOM 標頭，可直接用 Excel 開啟，不會有中文亂碼問題。
--   **高相容性**：同時支援淘寶和天貓的訂單格式。
+A powerful userscript designed for bulk exporting order data from Taobao/Tmall's "My Orders" page. It can scrape detailed information including product names, prices, quantities, SKUs, seller details, and even **tracking numbers**, then export it all into an Excel-compatible CSV file.
 
-## 🚀 安裝與使用
+This script is specially optimized for Taobao's complex front-end environment, tackling common technical challenges like **CORS**, **GBK encoding issues**, and **API anti-scraping mechanisms**.
 
-### 步驟 1: 安裝 Userscript 管理器
+---
 
-您需要在瀏覽器中安裝一個 Userscript 管理器。推薦使用以下任一擴充功能：
+### ✨ Key Features
 
--   [**Tampermonkey**](https://www.tampermonkey.net/) (支援 Chrome, Firefox, Edge, Safari)
--   [**Violentmonkey**](https://violentmonkey.github.io/) (支援 Chrome, Firefox, Edge)
+-   **One-Click Scraping**: Injects a control panel directly onto the "My Orders" page for easy operation.
+-   **Batch Processing**: Supports custom page ranges for automated multi-page scraping.
+-   **Tracking Info Retrieval**: Automatically visits each order's detail page to fetch the logistics company and tracking number.
+-   **Persistent Storage**: Scraped data is saved in the browser's `localStorage`, so you won't lose progress even if you close the page.
+-   **Smart Deduplication**: Automatically merges data and removes duplicate entries when run multiple times.
+-   **Excel-Friendly**: The exported CSV includes a BOM header, ensuring Chinese characters display correctly in Excel without garbling.
+-   **High Compatibility**: Supports both Taobao and Tmall order formats.
 
-### 步驟 2: 安裝本腳本
+### 🚀 Installation & Usage
 
-1.  點擊此處安裝腳本：[**taobaoOrderExporter.user.js**](https://github.com/your-repo/your-project/raw/main/taobaoOrderExporter.user.js)
-    *(注意：請將上面的 URL 替換為您實際的 GitHub Raw 檔案連結)*
-2.  您的 Userscript 管理器將會自動開啟一個安裝頁面。
-3.  點擊頁面上的「安裝」按鈕。
+#### Step 1: Install a Userscript Manager
 
-### 步驟 3: 開始使用
+You need a userscript manager extension in your browser. We recommend one of the following:
 
-1.  安裝完畢後，打開淘寶網站並登入您的帳號。
-2.  進入「**已買到的寶貝**」頁面 (https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm)。
-3.  您會在頁面左下角看到一個由本腳本新增的控制面板。
+-   [**Tampermonkey**](https://www.tampermonkey.net/) (Supports Chrome, Firefox, Edge, Safari)
+-   [**Violentmonkey**](https://violentmonkey.github.io/) (Supports Chrome, Firefox, Edge)
 
-    
-    *(注意：請將上面的 URL 替換為您的截圖連結)*
+#### Step 2: Install This Script
 
-4.  **操作流程**:
-    -   在「起始頁」和「結束頁」輸入框中，設定您想抓取的頁碼範圍。
-    -   點擊「**開始抓取指定頁碼訂單**」按鈕。
-    -   腳本會開始自動執行，您可以在「狀態」區域看到即時進度。
-    -   抓取過程中，腳本會自動處理翻頁和獲取物流詳情。
-    -   完成後，點擊「**下載CSV**」按鈕，即可將所有已抓取的訂單儲存為 `.csv` 檔案。
+1.  Click here to install: [**taobaoOrderExporter.user.js**](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js)
+2.  Your userscript manager will open an installation page.
+3.  Click the "Install" button.
 
-## 🛠️ 技術亮點
+#### Step 3: Get Started
 
-本腳本克服了在淘寶環境下進行自動化抓取的幾個主要障礙：
+1.  After installation, open the Taobao website and log in.
+2.  Navigate to the "**My Orders**" page (`https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm`).
+3.  You will see a new control panel injected by this script **directly above** your order list.
 
-1.  **繞過 API 風控**: 透過將 `fetch` 請求注入到頁面自身上下文 (`unsafeWindow`) 中執行，使得請求能攜帶正確的 Cookie 和 Session，模擬正常使用者行為，極大降低了被伺服器拒絕的風險。
-2.  **解決 CORS 跨域問題**: 使用 Tampermonkey 提供的 `GM_xmlhttpRequest` 特權 API，成功從 `taobao.com` 網域請求 `tmall.com` 的訂單詳情頁，從而獲取天貓訂單的物流資訊。
-3.  **處理 GBK 編碼**: 在 `fetch` 請求的回應中，先取得 `ArrayBuffer` 格式的原始資料，再使用 `TextDecoder('gbk')` 進行解碼，從根本上解決了中文亂碼問題。
+    *(A GIF demonstrating the script in action. You need to upload a `demo.gif` to the `assets` folder in your repository for this to work.)*
+    ![Script Demo GIF](https://github.com/DF-wu/taobaoOrderExporter/blob/main/assets/demo.gif?raw=true)
 
-## ⚠️ 免責聲明
+4.  **How to use**:
+    -   Set the desired page range in the "Start Page" and "End Page" input fields.
+    -   Click the "**Start Fetching Orders**" button.
+    -   The script will start running automatically. You can monitor the real-time progress in the "Status" area.
+    -   Once finished, click the "**Download CSV**" button to save all scraped orders as a `.csv` file.
 
--   本腳本僅供個人學習和研究 JavaScript 及 Web 自動化技術使用。
--   請在遵守淘寶網使用者協議的前提下，合理使用本腳本。
--   過於頻繁地使用可能觸發淘寶的風控機制，導致帳號需要驗證。建議每次抓取的頁數不宜過多，並在兩次抓取之間間隔一段時間。
--   作者不對任何因使用本腳本而導致的直接或間接後果負責。
+### 🛠️ Technical Highlights
 
-## 📄 授權
+This script overcomes several major obstacles in web scraping on Taobao:
 
-本專案採用 [MIT License](./LICENSE) 授權。
+1.  **Bypassing Anti-Scraping**: By injecting `fetch` requests into the page's own context (`unsafeWindow`), the requests carry the correct cookies and session tokens, mimicking normal user behavior and significantly reducing the risk of being blocked.
+2.  **Solving CORS Issues**: Uses the privileged `GM_xmlhttpRequest` API provided by Tampermonkey to successfully request order detail pages from `tmall.com` while on the `taobao.com` domain.
+3.  **Handling GBK Encoding**: Retrieves the raw `ArrayBuffer` from the `fetch` response and then decodes it using `TextDecoder('gbk')` to correctly handle Chinese characters.
+
+### ⚠️ Disclaimer
+
+-   This script is intended for personal educational and research purposes only.
+-   Please use this script in compliance with Taobao's user agreement.
+-   Excessive use may trigger Taobao's security mechanisms. It is recommended to scrape a reasonable number of pages at a time and to leave intervals between scraping sessions.
+-   The author is not responsible for any direct or indirect consequences resulting from the use of this script.
+
+### 📄 License
+
+This project is licensed under the [MIT License](https://github.com/DF-wu/taobaoOrderExporter/blob/main/LICENSE).
