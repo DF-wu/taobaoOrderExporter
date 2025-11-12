@@ -44,8 +44,7 @@
 2.  進入「**已買到的寶貝**」頁面 (https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm)。
 3.  您會在訂單列表的**正上方**看到一個由本腳本新增的控制面板。
 
-    *(操作示意圖。您需要將名為 `demo.gif` 的圖片上傳到您儲存庫的 `assets` 資料夾中，此圖片才會顯示。)*
-    ![腳本操作示意圖](https://github.com/DF-wu/taobaoOrderExporter/blob/main/assets/demo.gif?raw=true)
+    ![腳本操作示意圖](https://github.com/DF-wu/taobaoOrderExporter/blob/main/assets/demo.png?raw=true)
 
 4.  **操作流程**:
     -   在「起始頁」和「結束頁」輸入框中，設定您想抓取的頁碼範圍。

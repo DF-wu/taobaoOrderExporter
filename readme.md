@@ -51,8 +51,7 @@ You need a userscript manager extension in your browser. We recommend one of the
 2.  Navigate to the "**My Orders**" page (`https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm`).
 3.  You will see a new control panel injected by this script **directly above** your order list.
 
-    *(A GIF demonstrating the script in action. You need to upload a `demo.gif` to the `assets` folder in your repository for this to work.)*
-    ![Script Demo GIF](https://github.com/DF-wu/taobaoOrderExporter/blob/main/assets/demo.gif?raw=true)
+    ![Script Demo](https://github.com/DF-wu/taobaoOrderExporter/blob/main/assets/demo.png?raw=true)
 
 4.  **How to use**:
     -   Set the desired page range in the "Start Page" and "End Page" input fields.
