@@ -1,4 +1,4 @@
-# Taobao Order Exporter Userscript (Kilo Code Edition)
+# Taobao Order Exporter Userscript
 
 <div align="center">
 

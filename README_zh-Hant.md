@@ -4,7 +4,7 @@
 
 </div>
 
-# 淘寶訂單匯出 Userscript (Kilo Code 版)
+# 淘寶訂單匯出 Userscript
 
 [![Language](https://img.shields.io/badge/language-JavaScript-yellow.svg)](https://www.javascript.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)

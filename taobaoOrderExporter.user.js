@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         淘寶訂單匯出工具 (Kilo Code版)
+// @name         淘寶訂單匯出工具
 // @namespace    http://tampermonkey.net/
 // @version      1.0
 // @description  一個用於從淘寶訂單頁面匯出訂單資料為 CSV 檔案的 userscript 工具。
-// @author       Kilo Code
+// @author       df
 // @match        https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm*
 // @grant        unsafeWindow
 // @grant        GM_xmlhttpRequest
@@ -369,7 +369,7 @@
    *
    * UI 結構：
    * ┌─────────────────────────────────────────────────────────────┐
-   * │  淘寶訂單匯出工具 (Kilo Code 版)                            │
+   * │  淘寶訂單匯出工具                                             │
    * ├─────────────────────────────────────────────────────────────┤
    * │  起始頁: [1]  截止頁: [1]  |  狀態: 待命中  |  按鈕區域      │
    * │                             已儲存訂單: 0 筆                 │
@@ -406,7 +406,7 @@
 
     // 標題
     const title = document.createElement("h2");
-    title.textContent = "淘寶訂單匯出工具 (Kilo Code 版)";
+    title.textContent = "淘寶訂單匯出工具";
     title.style.margin = "0 0 15px 0";
     title.style.fontSize = "18px";
     title.style.color = "#333";
