@@ -1,3 +1,8 @@
 # IDE and tool-specific files
 .claude/
 .kilocode/
+node_modules/
+package.json
+package-lock.json
+*.log
+*.tmp
