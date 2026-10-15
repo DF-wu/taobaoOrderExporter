@@ -1,79 +1,48 @@
-# Taobao Order Exporter Userscript
+# Taobao Order Exporter v3
 
-<div align="center">
+[繁體中文](README_zh-Hant.md) · [Install / update userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js)
 
-[**English**](./readme.md) | [**繁體中文**](./README_zh-Hant.md)
+Export Taobao purchase history and tracking information into one **XLSX** or structured **JSON** file. The script reads the current order APIs directly instead of automating the official export dialog. It has no built-in ten-page limit and retrieves tracking for orders awaiting receipt.
 
-</div>
+## Usage
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Version-1.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/Tampermonkey-✅-brightgreen.svg" alt="Tampermonkey Compatible">
-  <img src="https://img.shields.io/badge/Violentmonkey-✅-brightgreen.svg" alt="Violentmonkey Compatible">
-  <img src="https://img.shields.io/badge/code%20style-prettier-ff69b4.svg" alt="Code Style: Prettier">
-</p>
+1. Install Tampermonkey or Violentmonkey in your browser, then install or update the linked userscript.
+2. Sign in and open [Purchased orders](https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm).
+3. Use the panel at the bottom right. Select an order category and starting page. Leave the ending page blank to continue until the final page. Requests default to a **5-second** interval, adjustable from 2 to 120 seconds.
+4. Start collection. Download XLSX or JSON when ready; downloads also work during collection.
+5. Review unresolved logistics in the panel and the exported `Errors` sheet / array.
 
-A powerful userscript designed for bulk exporting order data from Taobao/Tmall's "My Orders" page. It can scrape detailed information including product names, prices, quantities, SKUs, seller details, and even **tracking numbers**, then export it all into an Excel-compatible CSV file.
+The script uses the list's package data, the API behind **View logistics**, and the order detail API. It follows every package tab when the logistics page returns multiple packages. Company names, tracking numbers, available item relationships and provenance are preserved separately.
 
-This script is specially optimized for Taobao's complex front-end environment, tackling common technical challenges like **CORS**, **GBK encoding issues**, and **API anti-scraping mechanisms**.
+Enable the optional tracking history checkbox to query events for orders whose numbers are already available. Tracking numbers and companies are included by default.
 
----
+## Resuming and refreshing
 
-### ✨ Key Features
+- Stop preserves orders and the checkpoint in IndexedDB. Resume continues from the unfinished page after reloading or reopening the page.
+- Orders are deduplicated by their string IDs. New runs merge into existing records; they do not remove orders outside the selected range.
+- Retry logistics reloads affected source pages and queries missing data. If pagination has shifted, rerun the original range.
+- Login, verification and rate-limit responses pause collection. The panel provides an official verification link when available. Resolve it on Taobao, then resume or retry logistics.
+- Clear local data removes this tool's records for the current account after confirmation. Download a backup first.
 
--   **One-Click Scraping**: Injects a control panel directly onto the "My Orders" page for easy operation.
--   **Batch Processing**: Supports custom page ranges for automated multi-page scraping.
--   **Tracking Info Retrieval**: Automatically visits each order's detail page to fetch the logistics company and tracking number.
--   **Persistent Storage**: Scraped data is saved in the browser's `localStorage`, so you won't lose progress even if you close the page.
--   **Smart Deduplication**: Automatically merges data and removes duplicate entries when run multiple times.
--   **Excel-Friendly**: The exported CSV includes a BOM header, ensuring Chinese characters display correctly in Excel without garbling.
--   **High Compatibility**: Supports both Taobao and Tmall order formats.
+Successful tracking may be reused for up to one hour when repeating a collection. Unshipped and failed results are refreshed. A browser lock prevents simultaneous collection or deletion by another tab for the same account.
 
-### 🚀 Installation & Usage
+List, logistics, detail and network retry requests share the selected interval and run sequentially. The setting is saved with the checkpoint and can be changed before resuming. Rate-limit and verification responses pause immediately without automatic retries. Taobao's limits may still vary by account and time; increase the interval before continuing if needed.
 
-#### Step 1: Install a Userscript Manager
+## Files and privacy
 
-You need a userscript manager extension in your browser. We recommend one of the following:
+XLSX contains `Orders`, `Items`, `Packages`, `Errors`, and `Metadata`. IDs and cells are stored as text to preserve leading zeroes and long numbers and prevent product titles from becoming Excel formulas. Convert monetary and quantity columns to numbers when doing calculations. JSON keeps the nested structure without Excel's cell limits. See the [data format](docs/data-format.md).
 
--   [**Tampermonkey**](https://www.tampermonkey.net/) (Supports Chrome, Firefox, Edge, Safari)
--   [**Violentmonkey**](https://violentmonkey.github.io/) (Supports Chrome, Firefox, Edge)
+No CDN or runtime dependencies are required. The script keeps data in account-specific local IndexedDB databases and downloads; it does not upload records to third parties or export authentication cookies or recipient addresses. Tracking descriptions may contain carrier contact information.
 
-#### Step 2: Install This Script
+Keep the page open and the account signed in. Browser sleep or tab freezing pauses execution. Pagination reflects the order list at the time of collection, so new purchases can move records between pages. Available history still depends on what Taobao serves to your account.
 
-1.  Click here to install: [**taobaoOrderExporter.user.js**](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js)
-2.  Your userscript manager will open an installation page.
-3.  Click the "Install" button.
+## Development
 
-#### Step 3: Get Started
+```sh
+node --check taobaoOrderExporter.user.js
+node --test tests/exporter.test.cjs
+```
 
-1.  After installation, open the Taobao website and log in.
-2.  Navigate to the "**My Orders**" page (`https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm`).
-3.  You will see a new control panel injected by this script **directly above** your order list.
+Tests require Node 24 and Python 3, with no npm dependencies. Synthetic fixtures cover multi-package orders, exact IDs, collection beyond ten pages, checkpoint recovery, validation failures, storage errors, JSON, and independent ZIP/XML verification of XLSX output.
 
-    ![Script Demo](https://github.com/DF-wu/taobaoOrderExporter/blob/main/assets/demo.png?raw=true)
-
-4.  **How to use**:
-    -   Set the desired page range in the "Start Page" and "End Page" input fields.
-    -   Click the "**Start Fetching Orders**" button.
-    -   The script will start running automatically. You can monitor the real-time progress in the "Status" area.
-    -   Once finished, click the "**Download CSV**" button to save all scraped orders as a `.csv` file.
-
-### 🛠️ Technical Highlights
-
-This script overcomes several major obstacles in web scraping on Taobao:
-
-1.  **Bypassing Anti-Scraping**: By injecting `fetch` requests into the page's own context (`unsafeWindow`), the requests carry the correct cookies and session tokens, mimicking normal user behavior and significantly reducing the risk of being blocked.
-2.  **Solving CORS Issues**: Uses the privileged `GM_xmlhttpRequest` API provided by Tampermonkey to successfully request order detail pages from `tmall.com` while on the `taobao.com` domain.
-3.  **Handling GBK Encoding**: Retrieves the raw `ArrayBuffer` from the `fetch` response and then decodes it using `TextDecoder('gbk')` to correctly handle Chinese characters.
-
-### ⚠️ Disclaimer
-
--   This script is intended for personal educational and research purposes only.
--   Please use this script in compliance with Taobao's user agreement.
--   Excessive use may trigger Taobao's security mechanisms. It is recommended to scrape a reasonable number of pages at a time and to leave intervals between scraping sessions.
--   The author is not responsible for any direct or indirect consequences resulting from the use of this script.
-
-### 📄 License
-
-This project is licensed under the [MIT License](https://github.com/DF-wu/taobaoOrderExporter/blob/main/LICENSE).
+Current API baseline: October 15, 2026. The script uses the page's own MTOP SDK and reports unexpected response formats rather than silently exporting missing logistics.
