@@ -14,6 +14,7 @@ JSON 根物件包含 `schemaVersion`、`exporterVersion`、`exportedAt`、`job`�
 | `items[]` | 子訂單商品；包含 `subOrderId`, `productId`, `title`, `sku`, `quantity`, `displayedPrice`, `originalPrice`, `refundStatus`, `itemUrl`, `imageUrl` |
 | `packages[]` | 所有取得的包裹，可能超過一個 |
 | `logisticsStatus`, `logisticsError` | 物流完整性與查詢錯誤 |
+| `logisticsNote` | 可選；無需物流或已關閉無包裹的官方依據，另列於 XLSX Orders 最後的「物流說明」欄 |
 | `sourcePage`, `sourceTab`, `collectedAt`, `detailUrl` | 來源頁面、訂單範圍、擷取時間與詳情連結 |
 
 `packages[]` 包含：
@@ -31,6 +32,8 @@ JSON 根物件包含 `schemaVersion`、`exporterVersion`、`exportedAt`、`job`�
 
 - `complete`：取得的完整包裹清單均有公司與未遮蔽單號。
 - `not_shipped`：列表明確表示待付款／待發貨，且未提供包裹。之後按「重試物流」或重新擷取會更新；沒有 `logisticsError` 時不列入 `errors`。
+- `not_required`：詳情明確寫明「无需物流」，且目前與既有資料均沒有包裹；官方說明保留在 `logisticsNote`，不列入 `errors`。
+- `no_package`：交易已關閉，物流 API 回報 `NoPackageInfo`，且通過訂單號驗證的詳情亦無包裹；兩個來源的查詢結果保留在 `logisticsNote`，不列入 `errors`。這是官方目前無包裹紀錄的結果，並非從未發貨的證明。
 - `pending`：已儲存列表，尚未完成物流查詢（例如中途停止）。重新擷取時可能暫留上次取得的包裹，補查完成前不代表已重新驗證。
 - `partial`：仍有不完整或遮蔽的包裹資料，或重新查詢失敗而保留先前取得的包裹（原因見 `logisticsError`）。
 - `failed`：物流頁與詳情補查均未成功，原因保留在 `logisticsError`。
@@ -55,4 +58,6 @@ XLSX 有五張表：`Orders`、`Items`、`Packages`、`Errors`、`Metadata`。�
 
 多包裹的 `logisticsPackageList` 使用官方拼字 `pakcage`，需逐一查詢連結中的包裹識別；單包裹的 `logisticsDetailH5` 使用 `popupBodyCompony` 提供公司與單號。解析時核對主訂單與指定包裹單號；後續包裹查詢失敗會保留已成功核對的部分並標示錯誤。
 
-若官方物流頁回傳 `NoPackageInfo`，或顯示「暂无单号」而沒有 `mailNo`，仍列為待核對，不推斷該交易永遠沒有物流。
+「暂无单号」本身不足以判定無需物流。只有詳情明確說明無需物流，或已關閉交易同時符合兩個官方來源均無包裹的條件，才使用上述兩種狀態。進行中或交易成功的訂單若僅回傳 `NoPackageInfo`，仍列為待核對。已知單號永不因空回應清除。
+
+`job.lastError`（可選）保存最近一次中止的 `code`、`message`、`at`，重新整理後仍會顯示原因；續抓開始時清除。中途要求驗證或停止時，會先儲存當筆已成功取得的部分包裹，斷點保留在本頁。

@@ -305,3 +305,120 @@ test('物流頁失敗改用詳情時，保留同單號的商品對應與先前�
   assert.equal(order.logisticsStatus,'complete');assert.equal(order.packages[0].source,'detail.logisticsPackages');
   assert.deepEqual(order.packages[0].subOrderIds,[fixture.SUB1]);assert.equal(order.packages[0].events[0].description,'舊軌跡');
 });
+
+// 模擬 2026-10-26 實測的集運服務單與取消訂單；使用合成資料保護帳號資訊。
+function detailWithoutPackages(note='') {
+  const response=fixture.detail();response.data.data.packages.fields.packageInfos=[];
+  response.data.data.address={tag:'logisticsAddress',fields:{logisticsData:{detailText:note},addressData:{address:'不可匯出'}}};
+  return response;
+}
+function missingLogisticsOrder(status='卖家已发货') {
+  const input=fixture.list();delete input.data.data.logistics;input.data.data.shop.fields.tradeTitle=status;
+  return core.parseList(input,1).orders[0];
+}
+
+test('集運服務等無需物流訂單：需詳情明確確認，不列為失敗也不匯出收件資訊',async()=>{
+  const order=missingLogisticsOrder();
+  const response=fixture.logistics();delete response.data.data.company.fields.mailNo;response.data.data.company.fields.name='暂无单号';
+  await core.enrichOrder(order,async options=>options.api==='mtop.taobao.order.query.detailv2'
+    ?detailWithoutPackages('商家选择无需物流发货，暂无物流信息'):response,undefined,true);
+  assert.equal(order.logisticsStatus,'not_required');assert.equal(order.logisticsError,'');
+  assert.deepEqual(order.packages,[]);assert.match(order.logisticsNote,/无需物流/);
+  assert.equal(core.needsLogisticsRetry(order),false);
+  const document=core.exportDocument([order]);assert.equal(document.errors.length,0);
+  assert.ok(!JSON.stringify(document).includes('不可匯出'));
+  const tables=core.workbookTables(document);
+  assert.equal(tables.Orders[0].at(-1),'物流說明');assert.equal(tables.Orders[1].at(-1),order.logisticsNote);
+});
+
+test('交易關閉只有在物流回報 NoPackageInfo 且詳情無包裹時，記為 no_package',async()=>{
+  const order=missingLogisticsOrder('交易关闭');
+  await core.enrichOrder(order,async options=>options.api==='mtop.taobao.order.query.detailv2'
+    ?detailWithoutPackages():{ret:['NoPackageInfo::对不起，查不到包裹信息']},undefined,false);
+  assert.equal(order.logisticsStatus,'no_package');assert.equal(order.logisticsError,'');
+  assert.match(order.logisticsNote,/NoPackageInfo/);assert.equal(core.exportDocument([order]).errors.length,0);
+  assert.equal(core.needsLogisticsRetry(order),false);
+});
+
+test('沒有單號、單純沒有包裹或服務失敗，不得誤判成無需物流',async()=>{
+  for(const status of ['卖家已发货','交易成功','交易关闭']) {
+    const order=missingLogisticsOrder(status);
+    await assert.rejects(core.enrichOrder(order,async options=>options.api==='mtop.taobao.order.query.detailv2'
+      ?detailWithoutPackages('暂无物流信息'):{ret:['FAIL_BIZ_SERVICE_ERROR::服務故障']},undefined,false),{code:'LOGISTICS_UNAVAILABLE'});
+    assert.equal(order.logisticsStatus,'pending');
+  }
+  const order=missingLogisticsOrder();
+  await assert.rejects(core.enrichOrder(order,async options=>options.api==='mtop.taobao.order.query.detailv2'
+    ?detailWithoutPackages():{ret:['NoPackageInfo::对不起，查不到包裹信息']},undefined,false),{code:'LOGISTICS_UNAVAILABLE'});
+});
+
+test('已知包裹不能被無需物流／關閉無包裹的回應清除',async()=>{
+  for(const note of ['', '商家选择无需物流发货，暂无物流信息']) {
+    const order=core.parseList(fixture.list(),1).orders[0];order.status='交易关闭';order.logisticsStatus='pending';
+    const before=structuredClone(order.packages);
+    await assert.rejects(core.enrichOrder(order,async options=>options.api==='mtop.taobao.order.query.detailv2'
+      ?detailWithoutPackages(note):{ret:['NoPackageInfo::对不起，查不到包裹信息']},undefined,false),{code:'LOGISTICS_UNAVAILABLE'});
+    assert.deepEqual(order.packages,before);
+  }
+});
+
+test('NoPackageInfo 後詳情仍有包裹時，必須保留真實物流而非判為 no_package',async()=>{
+  const order=missingLogisticsOrder('交易关闭');
+  await core.enrichOrder(order,async options=>options.api==='mtop.taobao.order.query.detailv2'
+    ?fixture.detail():{ret:['NoPackageInfo::对不起，查不到包裹信息']},undefined,false);
+  assert.equal(order.logisticsStatus,'complete');assert.equal(order.packages.length,2);
+});
+
+test('僅已結束且明示無需物流可沿用；查無包裹、進行中或狀態變更則重查',()=>{
+  for(const logisticsStatus of ['not_required','no_package']) {
+    const previous={...missingLogisticsOrder('交易关闭'),logisticsStatus,logisticsNote:'官方無包裹紀錄'};
+    const same=core.mergePrevious(missingLogisticsOrder('交易关闭'),previous);
+    assert.equal(same.logisticsStatus,logisticsStatus==='not_required'?'not_required':'pending');
+    if(logisticsStatus==='not_required')assert.equal(same.logisticsNote,previous.logisticsNote);
+    assert.equal(core.mergePrevious(missingLogisticsOrder(),previous).logisticsStatus,'pending');
+    previous.status='卖家已发货';
+    assert.equal(core.mergePrevious(missingLogisticsOrder(),previous).logisticsStatus,'pending');
+  }
+});
+
+test('多包裹查至第二件要求驗證時，已取得包裹須先存檔並保留本頁斷點',async()=>{
+  const store=fixture.memoryStore();
+  await assert.rejects(core.collect({job:{nextPage:1,endPage:1,tabCode:'all'},store,
+    fetchPage:async()=>({orders:[missingLogisticsOrder()],hasMore:false}),
+    enrich:(order,signal,events)=>core.enrichOrder(order,async options=>{
+      if(!options.data.mailNo)return fixture.logisticsList();
+      if(options.data.mailNo==='AB0987654321')throw new core.ExportError('AUTH_OR_CHALLENGE','請驗證');
+      return fixture.logistics(options.data.mailNo);
+    },signal,events)}),{code:'AUTH_OR_CHALLENGE'});
+  const [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'pending');assert.equal(order.packages.length,1);
+  assert.equal(order.packages[0].trackingNumber,'001234567890123456789');
+  assert.equal(order.logisticsError,'請驗證');assert.equal((await store.getJob()).nextPage,1);
+});
+
+test('曾用詳情後備而缺軌跡的訂單，成功補查後清除舊錯誤',async()=>{
+  const order=core.parseList(fixture.list(),1).orders[0];
+  order.logisticsError='單號已從訂單詳情取得；物流頁暫不可用，軌跡待補查。';
+  await core.enrichOrder(order,logisticsApi,undefined,true);
+  assert.equal(order.logisticsStatus,'complete');assert.equal(order.logisticsError,'');
+  assert.equal(core.exportDocument([order]).errors.length,0);assert.ok(order.packages.every(p=>p.events.length>0));
+});
+
+test('NoPackageInfo 不能蓋過同一回應中的登入／驗證要求',()=>{
+  assert.throws(()=>core.parseLogistics({ret:['NoPackageInfo::沒有包裹','FAIL_SYS_SESSION_EXPIRED::請登入']},fixture.ORDER),{code:'AUTH_OR_CHALLENGE'});
+});
+
+test('SDK 直接 reject NoPackageInfo 時，共用轉換層仍保留錯誤種類供關閉訂單核對',async()=>{
+  const order=missingLogisticsOrder('交易关闭');
+  await core.enrichOrder(order,async options=>{
+    if(options.api==='mtop.taobao.order.query.detailv2')return detailWithoutPackages();
+    throw core.apiError({ret:['NoPackageInfo::对不起，查不到包裹信息']});
+  },undefined,true);
+  assert.equal(order.logisticsStatus,'no_package');assert.equal(order.logisticsError,'');
+});
+
+test('格式異常的 ret 仍回報受控 API 錯誤',()=>{
+  for(const ret of ['NoPackageInfo::不是陣列',{},null]) {
+    assert.throws(()=>core.parseLogistics({ret},fixture.ORDER),{code:'API_ERROR'});
+  }
+});

@@ -16,9 +16,12 @@ The script uses the list's package data, the API behind **View logistics**, and 
 
 Enable the optional tracking history checkbox to query events for orders whose numbers are already available. Tracking numbers and companies are included by default.
 
+Orders explicitly marked as requiring no shipping in the official detail response use `not_required`. Closed trades use `no_package` only when the logistics API reports `NoPackageInfo` and the validated detail response also has no packages. Both include a `logisticsNote` (the final column in XLSX Orders) and are excluded from Errors. A missing tracking number alone is still unresolved, and known tracking numbers are preserved.
+
 ## Resuming and refreshing
 
 - Stop preserves orders and the checkpoint in IndexedDB. Resume continues from the unfinished page after reloading or reopening the page.
+- The last stop reason is saved with the checkpoint and shown after reload. A verification request midway through multiple packages saves the packages already retrieved before pausing.
 - Orders are deduplicated by their string IDs. New runs merge into existing records; they do not remove orders outside the selected range.
 - Retry logistics revisits orders with unresolved logistics (pending, partial, failed or with an error) **and orders that had not shipped yet** when collected. It rereads each order's source page for the latest status. If the order is no longer there (new purchases shifted the pages, or it left the filtered tab after shipping), it queries logistics directly by order ID instead of asking you to rerun the range. If the source page shows a new status (for example `交易关闭`), the order is handled like a fresh collection. Failures never erase known tracking numbers. A failed direct lookup never downgrades the record (`not_shipped` stays `not_shipped`, complete tracking stays complete) and records the reason in Errors. Network or format errors while rereading a page stop the retry instead of trying every order.
 - Login, verification and rate-limit responses pause collection. The panel provides an official verification link when available. Resolve it on Taobao, then resume or retry logistics.
@@ -56,4 +59,4 @@ node --test tests/exporter.test.cjs
 
 Tests require Node 24 and Python 3, with no npm dependencies. Synthetic fixtures cover multi-package orders, exact IDs, collection beyond ten pages, checkpoint recovery, logistics refresh after shipping or pagination shifts, validation failures, storage errors, JSON, and independent ZIP/XML verification of XLSX output.
 
-Current API baseline: October 15, 2026. The script uses the page's own MTOP SDK and reports unexpected response formats rather than silently exporting missing logistics.
+Current API baseline: October 26, 2026. The script uses the page's own MTOP SDK and reports unexpected response formats rather than silently exporting missing logistics.

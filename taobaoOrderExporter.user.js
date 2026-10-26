@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         淘寶訂單批量導出工具
 // @namespace    http://tampermonkey.net/
-// @version      3.1.0
+// @version      3.1.1
 // @description  直接讀取新版訂單及多包裹物流，支援大量分頁、斷點續抓、XLSX 與 JSON。
 // @author       df
 // @match        https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm*
@@ -14,7 +14,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '3.1.0';
+  const VERSION = '3.1.1';
   // UI 檢查與 API 節流分開；API 預設逐筆間隔 5 秒，使用者可在面板調慢。
   const CONFIG = { SDK_CHECK_INTERVAL: 250, REQUEST_INTERVAL: 5000, UI_TASK_DELAY: 100, TIMEOUT: 30000, RETRIES: 2 };
   const LIST_API = 'mtop.taobao.order.queryboughtlistV2';
@@ -64,6 +64,8 @@
       if (url && new URL(url).protocol==='https:' && /(^|\.)(taobao|tmall)\.com$/.test(new URL(url).hostname)) error.verificationUrl=url;
       return error;
     }
+    // SDK 會直接 reject 業務錯誤，故須在共用轉換層辨識，而非等 parseLogistics 才處理。
+    if (Array.isArray(response?.ret) && response.ret.some(code=>/^NoPackageInfo(?:::|$)/.test(code))) return new ExportError('NO_PACKAGE_INFO',codes);
     return new ExportError('API_ERROR', codes || '訂單 API 回傳未知格式', /TIMEOUT|NETWORK|INNER_FAULT|SYSTEM_ERROR/i.test(codes));
   }
 
@@ -175,6 +177,12 @@
    */
   function mergePrevious(order, previous, now = Date.now()) {
     if (!previous) return order;
+    // 只快取已結束交易且官方明示無需物流的結果；單純查無包裹在重抓範圍時仍需重新核對。
+    if (order.logisticsStatus==='pending' && !order.packages.length && !previous.packages.length &&
+        previous.logisticsStatus==='not_required' && previous.status===order.status && SETTLED_STATUS.test(order.status)) {
+      order.logisticsStatus=previous.logisticsStatus;order.logisticsNote=previous.logisticsNote || '';
+      return order;
+    }
     const recentVerified = previous.packages.length > 0 && previous.packages.every(pkg => now - Date.parse(pkg.checkedAt) < 3600000);
     const reusable = previous.logisticsStatus === 'complete' && previous.status === order.status && previous.packages.length > 0 &&
       (SETTLED_STATUS.test(order.status) || recentVerified);
@@ -207,7 +215,7 @@
   }
 
   /** 已完成訂單通常不在列表帶包裹；從新版詳情 API 的 logisticsPackages 取完整清單。 */
-  function parseDetail(response, orderId, allowEmpty = false) {
+  function detailLogistics(response, orderId) {
     const failure=apiError(response);
     if (failure) throw failure;
     const protocol=response.data;
@@ -221,8 +229,16 @@
       // 詳情 API 未提供子訂單 ID 時保留原始商品描述，不能憑位置猜測對應商品。
       goods:(pkg.goodsInfos || []).map(g=>({title:text(g.goodsName),quantity:text(g.goodsQuantity),sku:text(g.sellProperty),itemUrl:absoluteUrl(g.tradeGoodUrl)})),
     }));
-    if (!packages.length && !allowEmpty) throw new ExportError('LOGISTICS_UNAVAILABLE','訂單詳情未提供包裹清單。');
-    return mergePackages([],packages);
+    // 「暂无单号」只代表尚無單號；只有官方明確說「无需物流」才可判定不需要物流。
+    // 僅保留物流說明，不能把同一節點中的 addressData 收件資訊寫進匯出檔。
+    const note=nodes.filter(n=>n.tag==='logisticsAddress').map(n=>text(n.fields?.logisticsData?.detailText)).filter(Boolean).join('；');
+    return {packages:mergePackages([],packages),notRequired:/无[需须]物流|不需要物流/.test(note),note};
+  }
+
+  function parseDetail(response, orderId, allowEmpty = false) {
+    const result=detailLogistics(response,orderId);
+    if (!result.packages.length && !allowEmpty) throw new ExportError('LOGISTICS_UNAVAILABLE','訂單詳情未提供包裹清單。');
+    return result.packages;
   }
 
   function detailRequest(orderId) {
@@ -297,18 +313,31 @@
   async function enrichOrder(order,request,signal,includeEvents) {
     if (order.logisticsStatus==='complete' && !includeEvents) return;
     let packages=[];
+    let missingEvents=false;
     try {
       packages=await loadLogistics(order.orderId,request,signal);
     } catch(error) {
       if (error.packages?.length) order.packages=mergePackages(order.packages,error.packages);
       if (['CANCELLED','AUTH_OR_CHALLENGE','ORDER_MISMATCH','LOGISTICS_MISMATCH','SCHEMA_CHANGED'].includes(error.code)) throw error;
       // 物流頁服務暫時不可用時，以同一訂單的詳情頁完整包裹清單作後備；不把失敗當無物流。
-      try {packages=parseDetail(await request(detailRequest(order.orderId),signal),order.orderId);}
+      try {
+        const detail=detailLogistics(await request(detailRequest(order.orderId),signal),order.orderId);
+        packages=detail.packages;
+        if (!packages.length && !order.packages.length) {
+          if (detail.notRequired || (error.code==='NO_PACKAGE_INFO' && /交易关闭/.test(order.status))) {
+            order.logisticsStatus=detail.notRequired?'not_required':'no_package';
+            order.logisticsNote=detail.notRequired?detail.note:'交易已關閉；物流 API 回報 NoPackageInfo，訂單詳情亦無包裹紀錄。';
+            order.logisticsError='';
+            return;
+          }
+        }
+        if (!packages.length) throw new ExportError('LOGISTICS_UNAVAILABLE','訂單詳情未提供包裹清單。');
+      }
       catch(detailError) {
         if (['CANCELLED','AUTH_OR_CHALLENGE','ORDER_MISMATCH','SCHEMA_CHANGED'].includes(detailError.code)) throw detailError;
         throw new ExportError('LOGISTICS_UNAVAILABLE',`查看物流：${error.message}；訂單詳情：${detailError.message}`);
       }
-      if (includeEvents) order.logisticsError='單號已從訂單詳情取得；物流頁暫不可用，軌跡待補查。';
+      if (includeEvents) missingEvents=true;
     }
     // 新取得的完整清單為準；依相同單號保留可驗證的商品關係，詳情後備沒有軌跡時保留先前查到的軌跡。
     for (const pkg of packages) {
@@ -318,7 +347,8 @@
       if (!pkg.events.length && previous.events?.length) pkg.events=previous.events;
     }
     order.packages=packages;order.logisticsStatus=packageStatus(packages);
-    if (!order.logisticsError?.startsWith('單號已從訂單詳情')) order.logisticsError='';
+    delete order.logisticsNote;
+    order.logisticsError=missingEvents?'單號已從訂單詳情取得；物流頁暫不可用，軌跡待補查。':'';
     if (order.logisticsStatus!=='complete') throw new ExportError('LOGISTICS_UNAVAILABLE','物流頁包裹仍缺少完整單號或公司，已保留可用資料。');
   }
 
@@ -383,7 +413,12 @@
           report(`第 ${page} 頁：補查物流 ${order.orderId}`);
           try { await enrich(order,signal,job.includeEvents); }
           catch (error) {
-            if (PAUSE_CODES.includes(error.code)) throw error;
+            if (PAUSE_CODES.includes(error.code)) {
+              // 後續包裹要求驗證／停止時，先保留同筆訂單已成功取得的包裹，再中止。
+              order.logisticsStatus='pending';order.logisticsError=error.message;
+              await store.putOrder(order);
+              throw error;
+            }
             order.logisticsError = error.message;
             order.logisticsStatus = order.packages.length ? 'partial' : 'failed';
           }
@@ -461,12 +496,12 @@
   }
 
   function workbookTables(document) {
-    const orders = [['主訂單號','購買時間','店舖','賣家','訂單狀態','實付款（訂單）','訂單總價','運費','幣別','物流狀態','物流錯誤','來源頁','擷取時間','訂單詳情']];
+    const orders = [['主訂單號','購買時間','店舖','賣家','訂單狀態','實付款（訂單）','訂單總價','運費','幣別','物流狀態','物流錯誤','來源頁','擷取時間','訂單詳情','物流說明']];
     const items = [['主訂單號','子訂單號','商品ID','商品名稱','規格','數量','商品顯示價格','原顯示價格','退款狀態','商品URL','圖片URL']];
     const packages = [['主訂單號','物流公司','物流公司代碼','物流單號','對應子訂單號（JSON）','資料來源','查詢時間','物流軌跡（JSON）','包裹商品描述（JSON）']];
     const errors = [['主訂單號','物流狀態','錯誤']];
     for (const o of document.orders) {
-      orders.push([o.orderId,o.createdAt,o.shopName,o.sellerName,o.status,o.actualPaid,o.totalPrice,o.shippingFee,o.currency,o.logisticsStatus,o.logisticsError,o.sourcePage,o.collectedAt,o.detailUrl]);
+      orders.push([o.orderId,o.createdAt,o.shopName,o.sellerName,o.status,o.actualPaid,o.totalPrice,o.shippingFee,o.currency,o.logisticsStatus,o.logisticsError,o.sourcePage,o.collectedAt,o.detailUrl,o.logisticsNote || '']);
       for (const i of o.items) items.push([o.orderId,i.subOrderId,i.productId,i.title,i.sku,i.quantity,i.displayedPrice,i.originalPrice,i.refundStatus,i.itemUrl,i.imageUrl]);
       for (const p of o.packages) packages.push([o.orderId,p.company,p.companyCode,p.trackingNumber,JSON.stringify(p.subOrderIds),p.source,p.checkedAt,JSON.stringify(p.events),JSON.stringify(p.goods || [])]);
     }
@@ -534,7 +569,7 @@
     return zip(files);
   }
 
-  const core = {VERSION,CONFIG,ExportError,id,parseList,parseDetail,parseLogistics,loadLogistics,enrichOrder,mergePackages,mergePrevious,packageStatus,needsLogisticsRetry,listRequest,detailRequest,logisticsRequest,requestInterval,retry,collect,retryLogistics,exportDocument,workbookTables,createXlsx};
+  const core = {VERSION,CONFIG,ExportError,id,apiError,parseList,parseDetail,parseLogistics,loadLogistics,enrichOrder,mergePackages,mergePrevious,packageStatus,needsLogisticsRetry,listRequest,detailRequest,logisticsRequest,requestInterval,retry,collect,retryLogistics,exportDocument,workbookTables,createXlsx};
   // Node 測試直接載入相同程式碼；瀏覽器不公開任何含私人資料的全域 API。
   if (typeof module === 'object' && module.exports) {module.exports=core;return;}
 
@@ -614,8 +649,9 @@
     const orders=await store.allOrders();
     const unresolved=orders.filter(o=>o.logisticsError || ['pending','partial','failed'].includes(o.logisticsStatus)).length;
     const notShipped=orders.filter(o=>o.logisticsStatus==='not_shipped' && !o.logisticsError).length;
+    const noLogistics=orders.filter(o=>['not_required','no_package'].includes(o.logisticsStatus) && !o.logisticsError).length;
     const packages=orders.reduce((sum,o)=>sum+o.packages.length,0);
-    ui.count.textContent=`已儲存 ${orders.length} 筆主訂單／${packages} 個包裹；${unresolved} 筆物流待補查、${notShipped} 筆擷取時未發貨`;
+    ui.count.textContent=`已儲存 ${orders.length} 筆主訂單／${packages} 個包裹；${unresolved} 筆物流待補查、${notShipped} 筆擷取時未發貨、${noLogistics} 筆無需物流／已關閉無包裹`;
   }
   function assertAccount() {
     if (currentAccount() !== store.account) throw new ExportError('AUTH_OR_CHALLENGE','登入帳號已切換；請重新整理以隔離不同帳號的訂單。');
@@ -681,6 +717,14 @@
     }
     catch(error) {
       status(`${error.code || 'ERROR'}：${error.message || error}`);
+      // 重整後仍顯示上次真正的中止原因；不能只剩「發現斷點」而失去偵錯線索。
+      try {
+        if (store) {
+          assertAccount();
+          const checkpoint=await store.getJob();
+          if (checkpoint && !checkpoint.completed) await store.savePage([],{...checkpoint,lastError:{code:error.code || 'ERROR',message:String(error.message || error),at:new Date().toISOString()}});
+        }
+      } catch(storageError) {console.error('[淘寶訂單匯出] 中止原因儲存失敗',storageError);}
       if (error.verificationUrl) {ui.verification.href=error.verificationUrl;ui.verification.hidden=false;}
     }
     finally {activeController=null;busy(false);await refreshCount();}
@@ -701,6 +745,7 @@
     }
     activeJob=resume ? await store.getJob() : readJob();
     if (!activeJob || (resume && activeJob.completed)) throw new ExportError('NO_CHECKPOINT','沒有未完成斷點，請開始新範圍。');
+    delete activeJob.lastError;
     // 續抓時以目前面板為準，允許使用者在限流後放慢速度。
     activeJob.requestIntervalMs=activeRequestInterval;
     await store.savePage([],activeJob);
@@ -713,7 +758,7 @@
     if (job) await store.savePage([],{...job,requestIntervalMs:activeRequestInterval});
     const result=await retryLogistics({store,fetchPage,enrich,signal,includeEvents:ui.events.checked,report:status});
     if (!result.total) {status('沒有需要補查物流的訂單。');return;}
-    status(`物流補查完成：${result.total} 筆中 ${result.complete} 筆已完整、${result.notShipped} 筆仍未發貨、${result.unresolved} 筆待核對（見 Errors）。`);
+    status(`物流補查完成：${result.total} 筆中 ${result.complete} 筆已核對、${result.notShipped} 筆仍未發貨、${result.unresolved} 筆待核對（見 Errors）。`);
   }
   async function download(format) {
     try {
@@ -794,6 +839,7 @@
       if (!(pageWindow.lib?.mtop || pageWindow.mtop)?.request) throw new ExportError('SDK_MISSING','淘寶 SDK 未載入，請重新整理後重試。');
       busy(false);await refreshCount();
       status(activeJob && !activeJob.completed ? `發現斷點：第 ${activeJob.nextPage} 頁，按「斷點續抓」繼續。` : '準備就緒。截止頁留空會讀取至最後一頁。');
+      if (activeJob?.lastError) status(`上次中止：${activeJob.lastError.code}：${activeJob.lastError.message}；保留第 ${activeJob.nextPage} 頁斷點。`);
     } catch(error) {status(`${error.code || 'ERROR'}：${error.message}`);}
   }
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(main,CONFIG.UI_TASK_DELAY),{once:true});
