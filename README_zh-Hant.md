@@ -52,9 +52,15 @@ XLSX 分成 Orders（主訂單）、Items（商品）、Packages（包裹）、E
 
 ## 開發與驗證
 
+### 聖天集運預報
+
+[聖天預報 skill](skills/shengtian-predeclare/SKILL.md) 可讓 agent 將匯出的 XLSX／JSON 與已登入的聖天帳號核對，保留已有及歷史紀錄、替未報包裹預報、自動按掉提交彈窗，並核對實際儲存內容。附有透過既有 Brave debug 連線執行的 Node／Python 工具，不需額外套件。簡短品名由 agent 核對商品與規格後產生；淘寶腳本本身不會自動上傳訂單。
+
 ```sh
 node --check taobaoOrderExporter.user.js
 node --test tests/exporter.test.cjs
+node --test tests/shengtian.test.mjs
+python tests/test_shengtian_export.py
 ```
 
 測試使用 Node 24 與 Python 3 標準函式庫，不需要 npm install。涵蓋多包裹、長 ID、超過十頁、停止續抓、物流補查（未發貨轉出貨、頁碼移動、失敗不清空）、錯頁、登入驗證、儲存失敗、JSON 及 XLSX 的 ZIP／XML 驗證。測試資料完全合成，不含真實訂單。

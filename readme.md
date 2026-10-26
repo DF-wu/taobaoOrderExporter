@@ -52,9 +52,15 @@ Keep the page open and the account signed in. Browser sleep or tab freezing paus
 
 ## Development
 
+### Shengtian forwarding declarations
+
+The [Shengtian predeclaration skill](skills/shengtian-predeclare/SKILL.md) lets an agent reconcile an exported XLSX/JSON with your signed-in Shengtian account, preserve existing and shipped records, fill missing declarations, acknowledge browser alerts, and verify the saved text. It includes dependency-free Node/Python helpers for an already-open Brave debugging session. Product names are reviewed by the agent; the exporter does not automatically upload orders.
+
 ```sh
 node --check taobaoOrderExporter.user.js
 node --test tests/exporter.test.cjs
+node --test tests/shengtian.test.mjs
+python tests/test_shengtian_export.py
 ```
 
 Tests require Node 24 and Python 3, with no npm dependencies. Synthetic fixtures cover multi-package orders, exact IDs, collection beyond ten pages, checkpoint recovery, logistics refresh after shipping or pagination shifts, validation failures, storage errors, JSON, and independent ZIP/XML verification of XLSX output.

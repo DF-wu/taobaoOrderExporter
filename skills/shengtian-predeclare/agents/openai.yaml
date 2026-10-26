@@ -1,0 +1,4 @@
+interface:
+  display_name: "聖天集運預報"
+  short_description: "核對淘寶匯出訂單與聖天歷史，自動填寫預報、處理確認彈窗並驗證結果"
+  default_prompt: "使用 $shengtian-predeclare 將這份淘寶訂單核對聖天紀錄，替尚未預報的包裹完成預報。"
