@@ -170,7 +170,7 @@
   /**
    * 用新列表資料更新已儲存的同一訂單（會修改 order）。
    * - 已結束交易且狀態未變：沿用完整物流，不再逐筆查詢；其他狀態只沿用一小時內驗證過的結果。
-   * - 列表不再附包裹時（已完成訂單常見），先暫留舊包裹；補查成功會整份取代，失敗則保留而非清空。
+   * - 列表包裹不完整或不再附包裹時（已完成訂單常見），先併入舊包裹；補查成功會整份取代，失敗則保留而非清空。
    * - 同一物流單號保留已查到的軌跡。
    */
   function mergePrevious(order, previous, now = Date.now()) {
@@ -180,8 +180,8 @@
       (SETTLED_STATUS.test(order.status) || recentVerified);
     if (order.logisticsStatus === 'pending' && reusable) {
       order.packages = previous.packages; order.logisticsStatus = 'complete';
-    } else if (order.logisticsStatus === 'pending' && !order.packages.length && previous.packages.length) {
-      order.packages = previous.packages;
+    } else if (['pending','partial'].includes(order.logisticsStatus) && previous.packages.length) {
+      order.packages = mergePackages(previous.packages, order.packages);
     }
     for (const pkg of order.packages) {
       const old = previous.packages.find(p => p.trackingNumber === pkg.trackingNumber);
@@ -403,7 +403,7 @@
    * 重試物流：先重讀訂單的來源頁，取得最新交易狀態與列表包裹。
    * 新訂單會把舊訂單往後推，篩選分頁（如待發貨）的訂單出貨後也會離開該分頁；
    * 原頁找不到時改用訂單號直接查物流，不要求重新擷取整個範圍。
-   * 補查失敗只更新錯誤，不清掉已知包裹，也不把仍查不到物流的未發貨訂單降級為失敗。
+   * 補查失敗只更新錯誤，不清掉已知包裹；直接查詢失敗時保留原狀態（例如未發貨）並記錄原因。
    */
   async function retryLogistics({store, fetchPage, enrich, signal, includeEvents = false, report = () => {}}) {
     const targets = (await store.allOrders()).filter(needsLogisticsRetry);
@@ -416,7 +416,8 @@
       if (!pages.has(pageKey)) {
         try { pages.set(pageKey, await fetchPage(original.sourcePage,tabCode,signal)); }
         catch (error) {
-          if (PAUSE_CODES.includes(error.code)) throw error;
+          // 只有頁碼已不存在才改直接查；網路或格式錯誤照舊停止，避免逐筆白跑。
+          if (!['PAGE_MISMATCH','EMPTY_PAGE'].includes(error.code)) throw error;
           report(`第 ${original.sourcePage} 頁讀取失敗（${error.message}），改以訂單號直接查物流。`);
           pages.set(pageKey, null);
         }
@@ -435,8 +436,14 @@
         try { await enrich(order,signal,includeEvents); }
         catch (error) {
           if (PAUSE_CODES.includes(error.code)) throw error;
-          if (!fresh && original.logisticsStatus==='not_shipped' && !order.packages.length) order = original;
-          else { order.logisticsStatus = order.packages.length ? 'partial' : 'failed'; order.logisticsError = error.message; }
+          if (fresh) {
+            order.logisticsStatus = order.packages.length ? 'partial' : 'failed'; order.logisticsError = error.message;
+          } else {
+            // 不知道最新交易狀態時不降級：未發貨維持未發貨、完整包裹維持完整，失敗原因列入 Errors。
+            if (!order.packages.length) order.logisticsStatus = original.logisticsStatus==='not_shipped' ? 'not_shipped' : 'failed';
+            else order.logisticsStatus = original.logisticsStatus==='complete' ? packageStatus(order.packages) : 'partial';
+            order.logisticsError = `原頁找不到此訂單，以訂單號查物流未成功；交易狀態可能已改變，可重新擷取範圍確認。${error.message}`;
+          }
         }
       }
       await store.putOrder(order);
