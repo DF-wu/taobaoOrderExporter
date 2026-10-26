@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         淘寶訂單批量導出工具
 // @namespace    http://tampermonkey.net/
-// @version      3.0.0
+// @version      3.1.0
 // @description  直接讀取新版訂單及多包裹物流，支援大量分頁、斷點續抓、XLSX 與 JSON。
 // @author       df
 // @match        https://buyertrade.taobao.com/trade/itemlist/list_bought_items.htm*
@@ -14,10 +14,14 @@
 (function () {
   'use strict';
 
-  const VERSION = '3.0.0';
+  const VERSION = '3.1.0';
   // UI 檢查與 API 節流分開；API 預設逐筆間隔 5 秒，使用者可在面板調慢。
   const CONFIG = { SDK_CHECK_INTERVAL: 250, REQUEST_INTERVAL: 5000, UI_TASK_DELAY: 100, TIMEOUT: 30000, RETRIES: 2 };
   const LIST_API = 'mtop.taobao.order.queryboughtlistV2';
+  // 交易已結束的狀態，包裹清單不會再變動；狀態未變且物流完整時可直接沿用先前結果。
+  const SETTLED_STATUS = /交易成功|交易关闭/;
+  // 這兩種錯誤代表使用者停止或淘寶要求驗證，必須立即中止整個流程。
+  const PAUSE_CODES = ['CANCELLED', 'AUTH_OR_CHALLENGE'];
 
   class ExportError extends Error {
     constructor(code, message, retryable = false) {
@@ -153,6 +157,39 @@
     return packages.every(p => p.trackingNumber && p.company && !/[*＊]/.test(p.trackingNumber)) ? 'complete' : 'partial';
   }
 
+  /** 「重試物流」的對象：物流未完整、有錯誤，或擷取當時尚未發貨（之後可能已出貨）。 */
+  function needsLogisticsRetry(order) {
+    return Boolean(order.logisticsError) || ['pending','partial','failed','not_shipped'].includes(order.logisticsStatus);
+  }
+
+  /** 列表沒有完整包裹時需要查物流；勾選補查軌跡時，已有包裹的訂單也要讀物流頁。 */
+  function shouldEnrich(order, includeEvents) {
+    return ['pending','partial'].includes(order.logisticsStatus) || (includeEvents && order.packages.length > 0);
+  }
+
+  /**
+   * 用新列表資料更新已儲存的同一訂單（會修改 order）。
+   * - 已結束交易且狀態未變：沿用完整物流，不再逐筆查詢；其他狀態只沿用一小時內驗證過的結果。
+   * - 列表包裹不完整或不再附包裹時（已完成訂單常見），先併入舊包裹；補查成功會整份取代，失敗則保留而非清空。
+   * - 同一物流單號保留已查到的軌跡。
+   */
+  function mergePrevious(order, previous, now = Date.now()) {
+    if (!previous) return order;
+    const recentVerified = previous.packages.length > 0 && previous.packages.every(pkg => now - Date.parse(pkg.checkedAt) < 3600000);
+    const reusable = previous.logisticsStatus === 'complete' && previous.status === order.status && previous.packages.length > 0 &&
+      (SETTLED_STATUS.test(order.status) || recentVerified);
+    if (order.logisticsStatus === 'pending' && reusable) {
+      order.packages = previous.packages; order.logisticsStatus = 'complete';
+    } else if (['pending','partial'].includes(order.logisticsStatus) && previous.packages.length) {
+      order.packages = mergePackages(previous.packages, order.packages);
+    }
+    for (const pkg of order.packages) {
+      const old = previous.packages.find(p => p.trackingNumber === pkg.trackingNumber);
+      if (old?.events?.length && !pkg.events?.length) pkg.events = old.events;
+    }
+    return order;
+  }
+
   /** 只在同一主訂單內合併包裹，保留同單多包裹與商品對應關係。 */
   function mergePackages(previous, incoming) {
     const result = [];
@@ -256,6 +293,35 @@
     return packages;
   }
 
+  /** 以訂單號補查物流：先讀「查看物流」，失敗再用訂單詳情；兩者都不需要訂單在列表中的頁碼。 */
+  async function enrichOrder(order,request,signal,includeEvents) {
+    if (order.logisticsStatus==='complete' && !includeEvents) return;
+    let packages=[];
+    try {
+      packages=await loadLogistics(order.orderId,request,signal);
+    } catch(error) {
+      if (error.packages?.length) order.packages=mergePackages(order.packages,error.packages);
+      if (['CANCELLED','AUTH_OR_CHALLENGE','ORDER_MISMATCH','LOGISTICS_MISMATCH','SCHEMA_CHANGED'].includes(error.code)) throw error;
+      // 物流頁服務暫時不可用時，以同一訂單的詳情頁完整包裹清單作後備；不把失敗當無物流。
+      try {packages=parseDetail(await request(detailRequest(order.orderId),signal),order.orderId);}
+      catch(detailError) {
+        if (['CANCELLED','AUTH_OR_CHALLENGE','ORDER_MISMATCH','SCHEMA_CHANGED'].includes(detailError.code)) throw detailError;
+        throw new ExportError('LOGISTICS_UNAVAILABLE',`查看物流：${error.message}；訂單詳情：${detailError.message}`);
+      }
+      if (includeEvents) order.logisticsError='單號已從訂單詳情取得；物流頁暫不可用，軌跡待補查。';
+    }
+    // 新取得的完整清單為準；依相同單號保留可驗證的商品關係，詳情後備沒有軌跡時保留先前查到的軌跡。
+    for (const pkg of packages) {
+      const previous=order.packages.find(p=>p.trackingNumber===pkg.trackingNumber);
+      if (!previous) continue;
+      pkg.subOrderIds=previous.subOrderIds;pkg.companyCode=previous.companyCode;
+      if (!pkg.events.length && previous.events?.length) pkg.events=previous.events;
+    }
+    order.packages=packages;order.logisticsStatus=packageStatus(packages);
+    if (!order.logisticsError?.startsWith('單號已從訂單詳情')) order.logisticsError='';
+    if (order.logisticsStatus!=='complete') throw new ExportError('LOGISTICS_UNAVAILABLE','物流頁包裹仍缺少完整單號或公司，已保留可用資料。');
+  }
+
   function listRequest(page, tabCode = 'all') {
     return {
       api:LIST_API, v:'1.0', appKey:'12574478', ttid:'1@tbwang_windows_1.0.0#pc',
@@ -307,26 +373,17 @@
       if (fingerprint && fingerprint === lastFingerprint) throw new ExportError('REPEATED_PAGE', 'API 重複回傳同一批訂單，已停止避免漏單。');
       for (const order of parsed.orders) {
         order.sourceTab=job.tabCode;
-        const previous = await store.getOrder(order.orderId);
-        const recentVerified=previous?.packages.length && previous.packages.every(pkg=>Date.now()-Date.parse(pkg.checkedAt)<3600000);
-        // 續抓同一批已完成訂單時，可重用一小時內驗證過的包裹；未發貨／失敗資料永不快取為完成。
-        if (order.logisticsStatus==='pending' && previous?.logisticsStatus==='complete' && previous.status===order.status && recentVerified) {
-          order.packages=previous.packages;order.logisticsStatus='complete';
-        }
-        // 相同頁面重抓時以新列表為準；僅保留同一物流單號已查到的軌跡，避免混入舊包裹。
-        for (const pkg of order.packages) {
-          const old = previous?.packages.find(p=>p.trackingNumber === pkg.trackingNumber);
-          if (old?.events?.length) pkg.events = old.events;
-        }
+        // 未發貨／失敗資料永不快取為完成；舊包裹只在補查前暫留，避免中途停止時清掉已知單號。
+        mergePrevious(order,await store.getOrder(order.orderId));
       }
       await store.savePage(parsed.orders, {...job,nextPage:page});
       for (const order of parsed.orders) {
         checkAbort(signal);
-        if (['pending','partial'].includes(order.logisticsStatus) || (job.includeEvents && order.packages.length)) {
+        if (shouldEnrich(order,job.includeEvents)) {
           report(`第 ${page} 頁：補查物流 ${order.orderId}`);
           try { await enrich(order,signal,job.includeEvents); }
           catch (error) {
-            if (['CANCELLED','AUTH_OR_CHALLENGE'].includes(error.code)) throw error;
+            if (PAUSE_CODES.includes(error.code)) throw error;
             order.logisticsError = error.message;
             order.logisticsStatus = order.packages.length ? 'partial' : 'failed';
           }
@@ -340,6 +397,61 @@
       if (job.completed) return job;
     }
     return job;
+  }
+
+  /**
+   * 重試物流：先重讀訂單的來源頁，取得最新交易狀態與列表包裹。
+   * 新訂單會把舊訂單往後推，篩選分頁（如待發貨）的訂單出貨後也會離開該分頁；
+   * 原頁找不到時改用訂單號直接查物流，不要求重新擷取整個範圍。
+   * 補查失敗只更新錯誤，不清掉已知包裹；直接查詢失敗時保留原狀態（例如未發貨）並記錄原因。
+   */
+  async function retryLogistics({store, fetchPage, enrich, signal, includeEvents = false, report = () => {}}) {
+    const targets = (await store.allOrders()).filter(needsLogisticsRetry);
+    const pages = new Map(), summary = {total:targets.length, complete:0, notShipped:0, unresolved:0};
+    for (let index = 0; index < targets.length; index++) {
+      checkAbort(signal);
+      const original = structuredClone(targets[index]);
+      const tabCode = original.sourceTab || 'all', pageKey = `${tabCode}:${original.sourcePage}`;
+      report(`重試物流 ${index+1}/${targets.length}：${original.orderId}`);
+      if (!pages.has(pageKey)) {
+        try { pages.set(pageKey, await fetchPage(original.sourcePage,tabCode,signal)); }
+        catch (error) {
+          // 只有頁碼已不存在才改直接查；網路或格式錯誤照舊停止，避免逐筆白跑。
+          if (!['PAGE_MISMATCH','EMPTY_PAGE'].includes(error.code)) throw error;
+          report(`第 ${original.sourcePage} 頁讀取失敗（${error.message}），改以訂單號直接查物流。`);
+          pages.set(pageKey, null);
+        }
+      }
+      const fresh = pages.get(pageKey)?.orders.find(o=>o.orderId===original.orderId);
+      let order;
+      if (fresh) {
+        order = mergePrevious(fresh, original);
+        order.sourceTab = tabCode;
+      } else {
+        // 交易狀態文字無法用物流 API 更新，保留原值；需要最新狀態時重新擷取範圍。
+        if (pages.get(pageKey)) report(`第 ${original.sourcePage} 頁已找不到 ${original.orderId}（頁碼移動或已離開分頁），改以訂單號直接查物流。`);
+        order = {...original, logisticsStatus:'pending', logisticsError:''};
+      }
+      if (!fresh || shouldEnrich(order,includeEvents)) {
+        try { await enrich(order,signal,includeEvents); }
+        catch (error) {
+          if (PAUSE_CODES.includes(error.code)) throw error;
+          if (fresh) {
+            order.logisticsStatus = order.packages.length ? 'partial' : 'failed'; order.logisticsError = error.message;
+          } else {
+            // 不知道最新交易狀態時不降級：未發貨維持未發貨、完整包裹維持完整，失敗原因列入 Errors。
+            if (!order.packages.length) order.logisticsStatus = original.logisticsStatus==='not_shipped' ? 'not_shipped' : 'failed';
+            else order.logisticsStatus = original.logisticsStatus==='complete' ? packageStatus(order.packages) : 'partial';
+            order.logisticsError = `原頁找不到此訂單，以訂單號查物流未成功；交易狀態可能已改變，可重新擷取範圍確認。${error.message}`;
+          }
+        }
+      }
+      await store.putOrder(order);
+      if (order.logisticsStatus==='not_shipped' && !order.logisticsError) summary.notShipped++;
+      else if (needsLogisticsRetry(order)) summary.unresolved++;
+      else summary.complete++;
+    }
+    return summary;
   }
 
   function exportDocument(orders, job) {
@@ -422,7 +534,7 @@
     return zip(files);
   }
 
-  const core = {VERSION,CONFIG,ExportError,id,parseList,parseDetail,parseLogistics,loadLogistics,mergePackages,packageStatus,listRequest,detailRequest,logisticsRequest,requestInterval,retry,collect,exportDocument,workbookTables,createXlsx};
+  const core = {VERSION,CONFIG,ExportError,id,parseList,parseDetail,parseLogistics,loadLogistics,enrichOrder,mergePackages,mergePrevious,packageStatus,needsLogisticsRetry,listRequest,detailRequest,logisticsRequest,requestInterval,retry,collect,retryLogistics,exportDocument,workbookTables,createXlsx};
   // Node 測試直接載入相同程式碼；瀏覽器不公開任何含私人資料的全域 API。
   if (typeof module === 'object' && module.exports) {module.exports=core;return;}
 
@@ -501,8 +613,9 @@
   async function refreshCount() {
     const orders=await store.allOrders();
     const unresolved=orders.filter(o=>o.logisticsError || ['pending','partial','failed'].includes(o.logisticsStatus)).length;
+    const notShipped=orders.filter(o=>o.logisticsStatus==='not_shipped' && !o.logisticsError).length;
     const packages=orders.reduce((sum,o)=>sum+o.packages.length,0);
-    ui.count.textContent=`已儲存 ${orders.length} 筆主訂單／${packages} 個包裹；${unresolved} 筆物流待補查`;
+    ui.count.textContent=`已儲存 ${orders.length} 筆主訂單／${packages} 個包裹；${unresolved} 筆物流待補查、${notShipped} 筆擷取時未發貨`;
   }
   function assertAccount() {
     if (currentAccount() !== store.account) throw new ExportError('AUTH_OR_CHALLENGE','登入帳號已切換；請重新整理以隔離不同帳號的訂單。');
@@ -528,7 +641,7 @@
         const timer=setTimeout(()=>{cleanup();reject(new ExportError('TIMEOUT','訂單 API 逾時',true));},CONFIG.TIMEOUT+1000);
         signal?.addEventListener('abort',abort,{once:true});
         Promise.resolve().then(()=>sdk.request(options)).then(value=>{cleanup();resolve(value);},error=>{
-          cleanup();reject(error?.ret ? apiError(error) : new ExportError('NETWORK','訂單 API 連線失敗',true));
+          cleanup();reject((error?.ret && apiError(error)) || new ExportError('NETWORK','訂單 API 連線失敗',true));
         });
       });
       checkAbort(signal);assertAccount();
@@ -542,30 +655,8 @@
     return parseList(await requestApi(listRequest(page,tabCode),signal),page);
   }
 
-  async function enrich(order,signal,includeEvents) {
-    if (order.logisticsStatus==='complete' && !includeEvents) return;
-    let packages=[];
-    try {
-      packages=await loadLogistics(order.orderId,requestApi,signal);
-    } catch(error) {
-      if (error.packages?.length) order.packages=mergePackages(order.packages,error.packages);
-      if (['CANCELLED','AUTH_OR_CHALLENGE','ORDER_MISMATCH','LOGISTICS_MISMATCH','SCHEMA_CHANGED'].includes(error.code)) throw error;
-      // 物流頁服務暫時不可用時，以同一訂單的詳情頁完整包裹清單作後備；不把失敗當無物流。
-      try {packages=parseDetail(await requestApi(detailRequest(order.orderId),signal),order.orderId);}
-      catch(detailError) {
-        if (['CANCELLED','AUTH_OR_CHALLENGE','ORDER_MISMATCH','SCHEMA_CHANGED'].includes(detailError.code)) throw detailError;
-        throw new ExportError('LOGISTICS_UNAVAILABLE',`查看物流：${error.message}；訂單詳情：${detailError.message}`);
-      }
-      if (includeEvents) order.logisticsError='單號已從訂單詳情取得；物流頁暫不可用，軌跡待補查。';
-    }
-    // 新取得的完整清單為準；依相同單號保留可驗證的商品關係。
-    for (const pkg of packages) {
-      const previous=order.packages.find(p=>p.trackingNumber===pkg.trackingNumber);
-      if (previous) {pkg.subOrderIds=previous.subOrderIds;pkg.companyCode=previous.companyCode;}
-    }
-    order.packages=packages;order.logisticsStatus=packageStatus(packages);
-    if (!order.logisticsError?.startsWith('單號已從訂單詳情')) order.logisticsError='';
-    if (order.logisticsStatus!=='complete') throw new ExportError('LOGISTICS_UNAVAILABLE','物流頁包裹仍缺少完整單號或公司，已保留可用資料。');
+  function enrich(order,signal,includeEvents) {
+    return enrichOrder(order,requestApi,signal,includeEvents);
   }
 
   async function exclusive(operation) {
@@ -603,6 +694,11 @@
   }
   async function start(resume,signal) {
     assertAccount();
+    if (!resume) {
+      const previous=await store.getJob();
+      // 開始新範圍會覆寫斷點；誤按時讓使用者有機會改按續抓。
+      if (previous && !previous.completed && !confirm(`目前有未完成斷點（第 ${previous.nextPage} 頁）。開始新範圍會取代此斷點，確定？`)) {status('已保留原斷點，可按「斷點續抓」繼續。');return;}
+    }
     activeJob=resume ? await store.getJob() : readJob();
     if (!activeJob || (resume && activeJob.completed)) throw new ExportError('NO_CHECKPOINT','沒有未完成斷點，請開始新範圍。');
     // 續抓時以目前面板為準，允許使用者在限流後放慢速度。
@@ -615,32 +711,13 @@
     assertAccount();
     const job=await store.getJob();
     if (job) await store.savePage([],{...job,requestIntervalMs:activeRequestInterval});
-    const orders=(await store.allOrders()).filter(o=>['pending','partial','failed'].includes(o.logisticsStatus) || o.logisticsError);
-    const pageCache=new Map();
-    for (let index=0;index<orders.length;index++) {
-      checkAbort(signal);
-      status(`重試物流 ${index+1}/${orders.length}：${orders[index].orderId}`);
-      // 重讀所屬頁才能更新完整包裹清單，避免把舊的未發貨／單包裹資訊永久快取。
-      const original=orders[index];
-      const tabCode=original.sourceTab || 'all';
-      const pageKey=`${tabCode}:${original.sourcePage}`;
-      if (!pageCache.has(pageKey)) pageCache.set(pageKey,await fetchPage(original.sourcePage,tabCode,signal));
-      const parsed=pageCache.get(pageKey);
-      const fresh=parsed.orders.find(o=>o.orderId===original.orderId);
-      if (!fresh) {original.logisticsError='訂單頁碼已因新訂單而移動，請重新擷取原範圍。';await store.putOrder(original);continue;}
-      fresh.sourceTab=tabCode;
-      if (['pending','partial'].includes(fresh.logisticsStatus) || ui.events.checked) {
-        try {await enrich(fresh,signal,ui.events.checked);} catch(error) {
-          if (['CANCELLED','AUTH_OR_CHALLENGE'].includes(error.code)) throw error;
-          fresh.logisticsStatus=fresh.packages.length?'partial':'failed';fresh.logisticsError=error.message;
-        }
-      }
-      await store.putOrder(fresh);
-    }
-    status('物流補查完成。');
+    const result=await retryLogistics({store,fetchPage,enrich,signal,includeEvents:ui.events.checked,report:status});
+    if (!result.total) {status('沒有需要補查物流的訂單。');return;}
+    status(`物流補查完成：${result.total} 筆中 ${result.complete} 筆已完整、${result.notShipped} 筆仍未發貨、${result.unresolved} 筆待核對（見 Errors）。`);
   }
   async function download(format) {
     try {
+      if (!store) throw new ExportError('NOT_READY','面板尚未初始化完成，請依狀態訊息處理後重新整理。');
       assertAccount();
       const orders=await store.allOrders();
       if (!orders.length) throw new ExportError('NO_DATA','尚未擷取任何訂單。');
@@ -677,7 +754,7 @@
       <div class="row" id="actions"></div><div class="row" id="downloads"></div>
       <p id="count"></p><p id="status" role="status" aria-live="polite">正在初始化…</p>
       <a id="verification" hidden target="_blank" rel="noopener noreferrer">開啟淘寶驗證，完成後回來續抓</a>
-      <p class="hint">截止留空會抓至最後一頁，無十頁上限。重新整理後按續抓；待核對資料列在 Errors。大量擷取期間請勿切換登入帳號。</p>
+      <p class="hint">截止留空會抓至最後一頁，無十頁上限。重新整理後按續抓；待核對資料列在 Errors。物流有更新時按「重試物流」，會補查待補查與擷取時未發貨的訂單。大量擷取期間請勿切換登入帳號。</p>
       <details><summary>執行紀錄</summary><pre id="log"></pre></details>
     </div></details>`;
     for (const key of ['startPage','endPage','tab','events','interval','count','status','log','verification']) ui[key]=shadow.getElementById(key);

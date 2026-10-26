@@ -188,3 +188,120 @@ test('已取消工作不再送請求，永久錯誤不重試',async()=>{
   await assert.rejects(core.retry(async()=>count++,controller.signal),{code:'CANCELLED'});assert.equal(count,0);
   await assert.rejects(core.retry(async()=>{count++;throw new core.ExportError('AUTH_OR_CHALLENGE','驗證');}),{code:'AUTH_OR_CHALLENGE'});assert.equal(count,1);
 });
+
+function unshippedList(page=1) {
+  const input=fixture.list(page);delete input.data.data.logistics;input.data.data.shop.fields.tradeTitle='买家已付款';return input;
+}
+async function storeWith(order,fields={}) {
+  const store=fixture.memoryStore();await store.putOrder({sourceTab:'all',...order,...fields});return store;
+}
+const emptyPage=page=>{const input=fixture.list(page);input.data.data={paging:input.data.data.paging};return core.parseList(input,page);};
+const logisticsApi=async options=>options.data.mailNo?fixture.logistics(options.data.mailNo):fixture.logisticsList();
+
+test('重試物流包含擷取時未發貨的訂單；出貨後原頁已帶包裹則不另查物流',async()=>{
+  const saved=core.parseList(unshippedList(),1).orders[0];
+  assert.equal(saved.logisticsStatus,'not_shipped');assert.equal(core.needsLogisticsRetry(saved),true);
+  const store=await storeWith(saved);
+  const result=await core.retryLogistics({store,fetchPage:async page=>core.parseList(fixture.list(page),page),enrich:async()=>{throw Error('列表已有完整包裹，不應補查');}});
+  assert.deepEqual(result,{total:1,complete:1,notShipped:0,unresolved:0});
+  const [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'complete');assert.equal(order.packages.length,2);assert.equal(order.status,'卖家已发货');
+});
+test('原頁找不到（新訂單使頁碼移動或已離開篩選分頁）時改用訂單號直接查物流',async()=>{
+  const store=await storeWith(core.parseList(unshippedList(),1).orders[0],{sourceTab:'waitSend'});
+  const pages=[];
+  const result=await core.retryLogistics({store,fetchPage:async(page,tab)=>{pages.push(`${tab}:${page}`);return emptyPage(page);},
+    enrich:(order,signal,events)=>core.enrichOrder(order,logisticsApi,signal,events)});
+  assert.deepEqual(pages,['waitSend:1']);assert.equal(result.complete,1);
+  const [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'complete');assert.equal(order.logisticsError,'');
+  assert.deepEqual(order.packages.map(p=>p.trackingNumber),['001234567890123456789','AB0987654321']);
+  assert.equal(order.status,'买家已付款');assert.equal(order.sourceTab,'waitSend');
+});
+test('直接查詢失敗時不降級：未發貨與完整物流維持原狀態，失敗原因列入 Errors',async()=>{
+  const store=await storeWith(core.parseList(unshippedList(),1).orders[0]);
+  const complete=core.parseList(fixture.list(),1).orders[0];complete.orderId+='-2';complete.logisticsError='單號已從訂單詳情取得；物流頁暫不可用，軌跡待補查。';
+  await store.putOrder({sourceTab:'all',...complete});
+  const result=await core.retryLogistics({store,fetchPage:async page=>emptyPage(page),enrich:async()=>{throw new core.ExportError('NETWORK','連線失敗',true);}});
+  assert.deepEqual(result,{total:2,complete:0,notShipped:0,unresolved:2});
+  const [unshipped,kept]=await store.allOrders();
+  assert.equal(unshipped.logisticsStatus,'not_shipped');assert.match(unshipped.logisticsError,/原頁找不到此訂單.*連線失敗/);
+  assert.equal(kept.logisticsStatus,'complete');assert.equal(kept.packages.length,2);assert.match(kept.logisticsError,/連線失敗/);
+  assert.equal(core.exportDocument([unshipped,kept]).errors.length,2);
+});
+test('重試物流：讀頁失敗改直接查，仍失敗保留已知包裹；驗證要求立即停止',async()=>{
+  const input=fixture.list();input.data.data.logistics.fields.packagePreview.packageViewList[0].cpName='';
+  const store=await storeWith(core.parseList(input,1).orders[0]);
+  let enriched=0;
+  const result=await core.retryLogistics({store,fetchPage:async()=>{throw new core.ExportError('PAGE_MISMATCH','頁碼不符');},
+    enrich:async()=>{enriched++;throw new core.ExportError('API_ERROR','物流頁故障');}});
+  assert.equal(enriched,1);assert.equal(result.unresolved,1);
+  const [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'partial');assert.match(order.logisticsError,/物流頁故障/);assert.equal(order.packages.length,2);
+  await assert.rejects(core.retryLogistics({store,fetchPage:async()=>{throw new core.ExportError('AUTH_OR_CHALLENGE','驗證');},enrich:async()=>{}}),{code:'AUTH_OR_CHALLENGE'});
+});
+test('重試物流：網路或格式錯誤導致讀頁失敗時停止，不逐筆白跑',async()=>{
+  const store=await storeWith(core.parseList(unshippedList(),1).orders[0]);
+  for (const error of [new core.ExportError('NETWORK','連線失敗',true),new core.ExportError('SCHEMA_CHANGED','格式改變')]) {
+    await assert.rejects(core.retryLogistics({store,fetchPage:async()=>{throw error;},enrich:async()=>{throw Error('不應逐筆查詢');}}),{code:error.code});
+  }
+  assert.equal((await store.allOrders())[0].logisticsStatus,'not_shipped');
+});
+test('重新擷取：已結束交易沿用完整物流不再重查，進行中訂單超過一小時仍重查',async()=>{
+  for (const [status,expected] of [['交易成功',0],['卖家已发货',1]]) {
+    const previous=core.parseList(fixture.list(),1).orders[0];previous.status=status;
+    previous.packages.forEach(p=>{p.checkedAt='2020-01-01T00:00:00.000Z';});
+    const store=await storeWith(previous),input=fixture.list();delete input.data.data.logistics;input.data.data.shop.fields.tradeTitle=status;
+    let enriched=0;
+    await core.collect({job:{nextPage:1,endPage:1,tabCode:'all'},store,fetchPage:async()=>core.parseList(input,1),enrich:async()=>{enriched++;}});
+    const [order]=await store.allOrders();
+    assert.equal(enriched,expected,status);assert.equal(order.packages.length,2);
+    assert.equal(order.logisticsStatus,expected?'pending':'complete',status);
+  }
+});
+test('重新擷取：列表包裹不完整時併入先前完整包裹，補查失敗不遺失單號與公司',async()=>{
+  const previous=core.parseList(fixture.list(),1).orders[0];previous.packages.forEach(p=>{p.checkedAt='2020-01-01T00:00:00.000Z';});
+  const input=fixture.list(),list=input.data.data.logistics.fields.packagePreview.packageViewList;list[0].cpName='';list.pop();
+  const store=await storeWith(previous);
+  await core.collect({job:{nextPage:1,endPage:1,tabCode:'all'},store,fetchPage:async()=>core.parseList(input,1),enrich:async()=>{throw new core.ExportError('LOGISTICS_UNAVAILABLE','物流頁故障');}});
+  const [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'partial');assert.deepEqual(order.packages.map(p=>p.trackingNumber),['001234567890123456789','AB0987654321']);
+  assert.equal(order.packages[0].company,'測試物流甲');
+});
+test('重新擷取＋真實補查：暫留的舊包裹讓詳情後備沿用商品對應與軌跡',async()=>{
+  // 上次是運送中，這次列表變成交易成功且不附包裹：狀態改變，不能直接沿用，必須補查。
+  const previous=core.parseList(fixture.list(),1).orders[0];
+  previous.packages.forEach(p=>{p.checkedAt='2020-01-01T00:00:00.000Z';});previous.packages[0].events=[{time:'10-14',status:'已簽收',description:'舊軌跡'}];
+  const input=fixture.list();delete input.data.data.logistics;input.data.data.shop.fields.tradeTitle='交易成功';
+  const store=await storeWith(previous);
+  await core.collect({job:{nextPage:1,endPage:1,tabCode:'all'},store,fetchPage:async()=>core.parseList(input,1),
+    enrich:(order,signal,events)=>core.enrichOrder(order,async options=>{
+      if (options.api==='mtop.taobao.order.query.detailv2') return fixture.detail();
+      throw new core.ExportError('API_ERROR','物流頁故障');
+    },signal,events)});
+  const [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'complete');assert.equal(order.status,'交易成功');assert.equal(order.packages[0].source,'detail.logisticsPackages');
+  assert.deepEqual(order.packages.map(p=>p.subOrderIds),[[fixture.SUB1],[fixture.SUB2]]);assert.equal(order.packages[0].events[0].description,'舊軌跡');
+});
+test('重新擷取時補查失敗或中途停止，不會清掉先前已知的物流單號',async()=>{
+  const previous=core.parseList(fixture.list(),1).orders[0];previous.packages.forEach(p=>{p.checkedAt='2020-01-01T00:00:00.000Z';});
+  const input=fixture.list();delete input.data.data.logistics;
+  let store=await storeWith(previous);
+  await core.collect({job:{nextPage:1,endPage:1,tabCode:'all'},store,fetchPage:async()=>core.parseList(input,1),enrich:async()=>{throw new core.ExportError('LOGISTICS_UNAVAILABLE','物流頁故障');}});
+  let [order]=await store.allOrders();
+  assert.equal(order.logisticsStatus,'partial');assert.equal(order.packages.length,2);assert.equal(order.logisticsError,'物流頁故障');
+  store=await storeWith(previous);const controller=new AbortController();
+  await assert.rejects(core.collect({job:{nextPage:1,endPage:1,tabCode:'all'},store,signal:controller.signal,fetchPage:async()=>core.parseList(input,1),
+    enrich:async()=>{controller.abort();throw new core.ExportError('CANCELLED','停止');}}),{code:'CANCELLED'});
+  [order]=await store.allOrders();assert.equal(order.logisticsStatus,'pending');assert.equal(order.packages.length,2);
+});
+test('物流頁失敗改用詳情時，保留同單號的商品對應與先前軌跡',async()=>{
+  const order=core.parseList(fixture.list(),1).orders[0];order.logisticsStatus='pending';
+  order.packages[0].events=[{time:'10-14 09:00',status:'已攬收',description:'舊軌跡'}];
+  await core.enrichOrder(order,async options=>{
+    if (options.api==='mtop.taobao.order.query.detailv2') return fixture.detail();
+    throw new core.ExportError('API_ERROR','物流頁故障');
+  },undefined,false);
+  assert.equal(order.logisticsStatus,'complete');assert.equal(order.packages[0].source,'detail.logisticsPackages');
+  assert.deepEqual(order.packages[0].subOrderIds,[fixture.SUB1]);assert.equal(order.packages[0].events[0].description,'舊軌跡');
+});

@@ -20,11 +20,22 @@ Enable the optional tracking history checkbox to query events for orders whose n
 
 - Stop preserves orders and the checkpoint in IndexedDB. Resume continues from the unfinished page after reloading or reopening the page.
 - Orders are deduplicated by their string IDs. New runs merge into existing records; they do not remove orders outside the selected range.
-- Retry logistics reloads affected source pages and queries missing data. If pagination has shifted, rerun the original range.
+- Retry logistics revisits orders with unresolved logistics (pending, partial, failed or with an error) **and orders that had not shipped yet** when collected. It rereads each order's source page for the latest status. If the order is no longer there (new purchases shifted the pages, or it left the filtered tab after shipping), it queries logistics directly by order ID instead of asking you to rerun the range. If the source page shows a new status (for example `交易关闭`), the order is handled like a fresh collection. Failures never erase known tracking numbers. A failed direct lookup never downgrades the record (`not_shipped` stays `not_shipped`, complete tracking stays complete) and records the reason in Errors. Network or format errors while rereading a page stop the retry instead of trying every order.
 - Login, verification and rate-limit responses pause collection. The panel provides an official verification link when available. Resolve it on Taobao, then resume or retry logistics.
 - Clear local data removes this tool's records for the current account after confirmation. Download a backup first.
 
-Successful tracking may be reused for up to one hour when repeating a collection. Unshipped and failed results are refreshed. A browser lock prevents simultaneous collection or deletion by another tab for the same account.
+When repeating a collection, complete tracking is reused without new requests for orders whose status is still `交易成功` or `交易关闭` (finished trades), except that tracking history is reread when its checkbox is enabled. Other statuses reuse results for up to one hour. Unshipped and failed results are refreshed. When the list returns incomplete packages, previously known tracking numbers are merged in first: a failed refresh marks the order `partial` with the error, and a stopped one leaves it `pending` until you resume or retry. Neither clears known tracking numbers. Starting a new range asks before replacing an unfinished checkpoint. A browser lock prevents simultaneous collection or deletion by another tab for the same account.
+
+### Which button after logistics updates?
+
+| Situation | Action |
+| --- | --- |
+| The order had not shipped or had no logistics last time; tracking is available now | **Retry logistics**. It only touches unfinished orders and still works after pagination shifts. |
+| Tracking numbers are known; you want fresh in-transit events | Check the tracking-history box, choose the 待收貨 tab, then **Start**. |
+| You also want updated trade status, items or new orders | **Start** the same range again; complete logistics of finished trades is reused. |
+| Collection stopped or needed verification | **Resume**. |
+
+The logistics API has no trade status, so a direct lookup by order ID keeps the order status text from the last list read. Rerun the range when you need the current status.
 
 List, logistics, detail and network retry requests share the selected interval and run sequentially. The setting is saved with the checkpoint and can be changed before resuming. Rate-limit and verification responses pause immediately without automatic retries. Taobao's limits may still vary by account and time; increase the interval before continuing if needed.
 
@@ -43,6 +54,6 @@ node --check taobaoOrderExporter.user.js
 node --test tests/exporter.test.cjs
 ```
 
-Tests require Node 24 and Python 3, with no npm dependencies. Synthetic fixtures cover multi-package orders, exact IDs, collection beyond ten pages, checkpoint recovery, validation failures, storage errors, JSON, and independent ZIP/XML verification of XLSX output.
+Tests require Node 24 and Python 3, with no npm dependencies. Synthetic fixtures cover multi-package orders, exact IDs, collection beyond ten pages, checkpoint recovery, logistics refresh after shipping or pagination shifts, validation failures, storage errors, JSON, and independent ZIP/XML verification of XLSX output.
 
 Current API baseline: October 15, 2026. The script uses the page's own MTOP SDK and reports unexpected response formats rather than silently exporting missing logistics.
