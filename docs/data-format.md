@@ -37,7 +37,7 @@ JSON 根物件包含 `schemaVersion`、`exporterVersion`、`exportedAt`、`job`�
 
 `errors[]` 收集 pending、partial、failed 和其他補查問題。查不到物流不代表沒有物流，不會填入假的單號。
 
-`status` 是最後一次讀取列表時的交易狀態。「重試物流」在原頁找不到訂單而改用訂單號查物流時，只更新 `packages` 與物流狀態，`status` 保留原值；查詢失敗時物流狀態也保留原值，原因寫入 `logisticsError`。
+`status` 是最後一次讀取列表時的交易狀態。「重試物流」在原頁找不到訂單而改用訂單號查物流時，只更新 `packages` 與物流狀態，`status` 保留原值；查詢失敗時不降級物流狀態（`not_shipped` 維持、完整包裹維持 `complete`；尚未查過的 `pending` 依一般規則記為 `failed`），原因寫入 `logisticsError`。
 
 XLSX 有五張表：`Orders`、`Items`、`Packages`、`Errors`、`Metadata`。它們與 JSON 對應，ID 與內容均使用文字儲存格，保留前導零與長整數，商品文字不會被 Excel 當公式執行。需要運算時請另行把金額／數量轉成數值。
 
