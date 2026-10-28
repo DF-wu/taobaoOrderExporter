@@ -54,6 +54,8 @@ XLSX 分成 Orders（主訂單）、Items（商品）、Packages（包裹）、E
 
 [聖天預報 userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/shengtian-predeclare.user.js) 可在 [我的包裹](http://member.stjh168.com/Member/MyPack) 頁貼上／匯入 JSON，核對目前包裹及歷史紀錄後逐筆預報。支援簡單包裹清單、既有預報計畫及本工具的淘寶 JSON；品名可在預覽中核對及修改。已有紀錄會保留，提交後回讀核對，逾時或未知結果不盲目重送。同源 API 提交避開官方前端的 alert 與整頁重整，不會全域關閉網站彈窗。安裝後不需要 debug port 或 Node。詳見 [安裝、JSON 格式與例外處理](docs/shengtian-userscript.md)。
 
+`1.1.0` 起可設定自己的 OpenAI Chat Completions 相容 API，生成簡短品名與備註建議。支援自訂網址、模型、金鑰及提示詞；生成前先只讀核對已預報與歷史紀錄，建議先預覽，套用後仍須核對才會預報。金鑰預設只留在分頁記憶體，也可選擇存於腳本管理器；不放入網站資料庫或匯出結果。詳見 [自訂 LLM API](docs/shengtian-userscript.md#自訂-llm-api)。
+
 [聖天預報 skill](skills/shengtian-predeclare/SKILL.md) 可讓 agent 將匯出的 XLSX／JSON 與已登入的聖天帳號核對，保留已有及歷史紀錄、替未報包裹預報、自動按掉提交彈窗，並核對實際儲存內容。附有透過既有 Brave debug 連線執行的 Node／Python 工具，不需額外套件。簡短品名由 agent 核對商品與規格後產生；淘寶腳本本身不會自動上傳訂單。
 
 ## 開發與驗證
@@ -62,7 +64,7 @@ XLSX 分成 Orders（主訂單）、Items（商品）、Packages（包裹）、E
 node --check taobaoOrderExporter.user.js
 node --check shengtian-predeclare.user.js
 node --test tests/exporter.test.cjs
-node --test tests/shengtian.test.mjs tests/shengtian-userscript.test.cjs
+node --test tests/shengtian.test.mjs tests/shengtian-userscript.test.cjs tests/shengtian-llm.test.cjs
 python tests/test_shengtian_export.py
 ```
 

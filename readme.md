@@ -54,6 +54,8 @@ Keep the page open and the account signed in. Browser sleep or tab freezing paus
 
 The [Shengtian userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/shengtian-predeclare.user.js) accepts pasted or uploaded JSON on [My packages](http://member.stjh168.com/Member/MyPack). It supports simple package lists, existing declaration plans, and this exporter's Taobao JSON, with editable product names and a preview before submission. It checks current and historical records, preserves existing declarations, and verifies saved fields after each submission. Timeouts and unknown outcomes are reconciled before any further action. Same-origin API calls avoid the site's native alert/reload submission flow without replacing global dialog functions. Normal use requires neither a debugging port nor Node. See the [installation, JSON formats, and error handling guide](docs/shengtian-userscript.md) (Traditional Chinese).
 
+Version `1.1.0` adds optional product-name and memo suggestions through your own OpenAI Chat Completions-compatible API. Configure its endpoint, model, key, and instructions. Generation first checks current and historical declarations, then displays suggestions for review. Applied text still requires confirmation before declaration. Keys remain in page memory by default, with optional userscript-manager storage; they are excluded from the site's database and result exports. See [custom LLM API setup](docs/shengtian-userscript.md#自訂-llm-api) (Traditional Chinese).
+
 The [Shengtian predeclaration skill](skills/shengtian-predeclare/SKILL.md) lets an agent reconcile an exported XLSX/JSON with your signed-in Shengtian account, preserve existing and shipped records, fill missing declarations, acknowledge browser alerts, and verify the saved text. It includes dependency-free Node/Python helpers for an already-open Brave debugging session. Product names are reviewed by the agent; the exporter does not automatically upload orders.
 
 ## Development
@@ -62,7 +64,7 @@ The [Shengtian predeclaration skill](skills/shengtian-predeclare/SKILL.md) lets 
 node --check taobaoOrderExporter.user.js
 node --check shengtian-predeclare.user.js
 node --test tests/exporter.test.cjs
-node --test tests/shengtian.test.mjs tests/shengtian-userscript.test.cjs
+node --test tests/shengtian.test.mjs tests/shengtian-userscript.test.cjs tests/shengtian-llm.test.cjs
 python tests/test_shengtian_export.py
 ```
 
