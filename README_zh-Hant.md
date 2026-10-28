@@ -1,6 +1,6 @@
 # 淘寶訂單批量匯出 v3
 
-[English](readme.md) · [安裝／更新腳本](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js)
+[English](readme.md) · [安裝／更新淘寶腳本](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js) · [安裝／更新聖天預報腳本](https://github.com/DF-wu/taobaoOrderExporter/raw/main/shengtian-predeclare.user.js)
 
 從淘寶「已買到的寶貝」直接讀取訂單及物流資料，匯出一個 **XLSX** 或 **JSON**。不再操作官方匯出按鈕，程式沒有十頁上限，也可取得尚未確認收貨訂單的物流。
 
@@ -50,16 +50,19 @@ XLSX 分成 Orders（主訂單）、Items（商品）、Packages（包裹）、E
 
 請維持登入並保持頁面開啟；瀏覽器休眠、分頁凍結或關閉會暫停執行。不同分頁篩選或新增訂單可能改變頁碼；頁碼代表擷取當下的排序，並非淘寶提供的歷史快照。此工具沒有自行增加頁數限制，仍受淘寶帳號可見資料範圍與服務回應影響。
 
-## 開發與驗證
+## 聖天集運預報
 
-### 聖天集運預報
+[聖天預報 userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/shengtian-predeclare.user.js) 可在 [我的包裹](http://member.stjh168.com/Member/MyPack) 頁貼上／匯入 JSON，核對目前包裹及歷史紀錄後逐筆預報。支援簡單包裹清單、既有預報計畫及本工具的淘寶 JSON；品名可在預覽中核對及修改。已有紀錄會保留，提交後回讀核對，逾時或未知結果不盲目重送。同源 API 提交避開官方前端的 alert 與整頁重整，不會全域關閉網站彈窗。安裝後不需要 debug port 或 Node。詳見 [安裝、JSON 格式與例外處理](docs/shengtian-userscript.md)。
 
 [聖天預報 skill](skills/shengtian-predeclare/SKILL.md) 可讓 agent 將匯出的 XLSX／JSON 與已登入的聖天帳號核對，保留已有及歷史紀錄、替未報包裹預報、自動按掉提交彈窗，並核對實際儲存內容。附有透過既有 Brave debug 連線執行的 Node／Python 工具，不需額外套件。簡短品名由 agent 核對商品與規格後產生；淘寶腳本本身不會自動上傳訂單。
 
+## 開發與驗證
+
 ```sh
 node --check taobaoOrderExporter.user.js
+node --check shengtian-predeclare.user.js
 node --test tests/exporter.test.cjs
-node --test tests/shengtian.test.mjs
+node --test tests/shengtian.test.mjs tests/shengtian-userscript.test.cjs
 python tests/test_shengtian_export.py
 ```
 

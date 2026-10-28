@@ -13,3 +13,6 @@ jobs:
           python-version: '3.13'
       - run: node --check taobaoOrderExporter.user.js
       - run: node --test tests/exporter.test.cjs
+      - run: node --check shengtian-predeclare.user.js
+      - run: node --test tests/shengtian-userscript.test.cjs tests/shengtian.test.mjs
+      - run: python -m unittest discover -s tests -p "test_shengtian_export.py"

@@ -1,6 +1,6 @@
 # Taobao Order Exporter v3
 
-[繁體中文](README_zh-Hant.md) · [Install / update userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js)
+[繁體中文](README_zh-Hant.md) · [Install / update Taobao userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/taobaoOrderExporter.user.js) · [Install / update Shengtian userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/shengtian-predeclare.user.js)
 
 Export Taobao purchase history and tracking information into one **XLSX** or structured **JSON** file. The script reads the current order APIs directly instead of automating the official export dialog. It has no built-in ten-page limit and retrieves tracking for orders awaiting receipt.
 
@@ -50,16 +50,19 @@ No CDN or runtime dependencies are required. The script keeps data in account-sp
 
 Keep the page open and the account signed in. Browser sleep or tab freezing pauses execution. Pagination reflects the order list at the time of collection, so new purchases can move records between pages. Available history still depends on what Taobao serves to your account.
 
-## Development
+## Shengtian forwarding declarations
 
-### Shengtian forwarding declarations
+The [Shengtian userscript](https://github.com/DF-wu/taobaoOrderExporter/raw/main/shengtian-predeclare.user.js) accepts pasted or uploaded JSON on [My packages](http://member.stjh168.com/Member/MyPack). It supports simple package lists, existing declaration plans, and this exporter's Taobao JSON, with editable product names and a preview before submission. It checks current and historical records, preserves existing declarations, and verifies saved fields after each submission. Timeouts and unknown outcomes are reconciled before any further action. Same-origin API calls avoid the site's native alert/reload submission flow without replacing global dialog functions. Normal use requires neither a debugging port nor Node. See the [installation, JSON formats, and error handling guide](docs/shengtian-userscript.md) (Traditional Chinese).
 
 The [Shengtian predeclaration skill](skills/shengtian-predeclare/SKILL.md) lets an agent reconcile an exported XLSX/JSON with your signed-in Shengtian account, preserve existing and shipped records, fill missing declarations, acknowledge browser alerts, and verify the saved text. It includes dependency-free Node/Python helpers for an already-open Brave debugging session. Product names are reviewed by the agent; the exporter does not automatically upload orders.
 
+## Development
+
 ```sh
 node --check taobaoOrderExporter.user.js
+node --check shengtian-predeclare.user.js
 node --test tests/exporter.test.cjs
-node --test tests/shengtian.test.mjs
+node --test tests/shengtian.test.mjs tests/shengtian-userscript.test.cjs
 python tests/test_shengtian_export.py
 ```
 
