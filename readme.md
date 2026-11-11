@@ -71,3 +71,13 @@ python tests/test_shengtian_export.py
 Tests require Node 24 and Python 3, with no npm dependencies. Synthetic fixtures cover multi-package orders, exact IDs, collection beyond ten pages, checkpoint recovery, logistics refresh after shipping or pagination shifts, validation failures, storage errors, JSON, and independent ZIP/XML verification of XLSX output.
 
 Current API baseline: October 26, 2026. The script uses the page's own MTOP SDK and reports unexpected response formats rather than silently exporting missing logistics.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=DF-wu/taobaoOrderExporter&amp;type=date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DF-wu/taobaoOrderExporter&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=DF-wu/taobaoOrderExporter&amp;type=Date" />
+    <img alt="GitHub stars over time for DF-wu/taobaoOrderExporter" src="https://api.star-history.com/svg?repos=DF-wu/taobaoOrderExporter&amp;type=Date" />
+  </picture>
+</a>

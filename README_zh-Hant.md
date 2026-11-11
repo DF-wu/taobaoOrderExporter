@@ -71,3 +71,13 @@ python tests/test_shengtian_export.py
 測試使用 Node 24 與 Python 3 標準函式庫，不需要 npm install。涵蓋多包裹、長 ID、超過十頁、停止續抓、物流補查（未發貨轉出貨、頁碼移動、失敗不清空）、錯頁、登入驗證、儲存失敗、JSON 及 XLSX 的 ZIP／XML 驗證。測試資料完全合成，不含真實訂單。
 
 新版 API 觀察基準：2026-10-26。實作直接使用淘寶頁面的 MTOP SDK；若官方變更資料結構，程式會顯示錯誤，請勿將缺漏的物流當成未發貨。
+
+## Star 趨勢
+
+<a href="https://www.star-history.com/?repos=DF-wu/taobaoOrderExporter&amp;type=date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DF-wu/taobaoOrderExporter&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=DF-wu/taobaoOrderExporter&amp;type=Date" />
+    <img alt="DF-wu/taobaoOrderExporter 的 GitHub 星數隨時間變化圖" src="https://api.star-history.com/svg?repos=DF-wu/taobaoOrderExporter&amp;type=Date" />
+  </picture>
+</a>
