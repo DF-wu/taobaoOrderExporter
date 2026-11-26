@@ -12,7 +12,7 @@ const declaration = (trackingNumber = TRACKING, extra = {}) => ({
 const entry = (trackingNumber = TRACKING, extra = {}) =>
   core.normalizeInput([declaration(trackingNumber, extra)]).entries[0];
 const record = (candidate, extra = {}) => ({
-  id: 'synthetic-pack-id', kdBillCode: candidate.trackingNumber,
+  id: '1001', kdBillCode: candidate.trackingNumber,
   goods: candidate.goods, goods_memo: candidate.memo, Number: candidate.number, Is_Yb: 1, ...extra,
 });
 const newJob = (entries = [entry()]) => ({ accountMarker: ACCOUNT, entries });
@@ -143,9 +143,9 @@ test('current package classification preserves manual edits and checks historica
   const candidate = entry();
   assert.equal(core.classifyCurrent(candidate, [], { count: 0 }).status, 'ready');
   assert.equal(core.classifyCurrent(candidate, [], { count: 2 }).status, 'historical');
-  assert.equal(core.classifyCurrent(candidate, [record(candidate, { Is_Yb: 0, goods: '', goods_memo: null })], { count: 0 }).status, 'blank-arrived');
+  assert.equal(core.classifyCurrent(candidate, [record(candidate, { Is_Yb: 0, goods: '', goods_memo: null })], { count: 0 }).status, 'incomplete');
   for (const data of [{ goods: '手动品名', goods_memo: '' }, { goods: '', goods_memo: '手动备注' }, { goods: '', goods_memo: '', Is_Yb: 1 }]) {
-    assert.equal(core.classifyCurrent(candidate, [record(candidate, { Is_Yb: 0, ...data })], { count: 0 }).status, 'existing');
+    assert.equal(core.classifyCurrent(candidate, [record(candidate, { Is_Yb: 0, ...data })], { count: 0 }).status, 'incomplete');
   }
   assert.equal(core.classifyCurrent(candidate, [record(candidate), record(candidate, { id: 'another-id' })], { count: 0 }).status, 'duplicate_server');
 });
@@ -198,18 +198,38 @@ test('preexisting and historical packages are skipped without altering their con
   assert.deepEqual(h.state.rows, before);
 });
 
-test('blank automatic warehouse arrival can be declared and its existing server ID retained', async () => {
+test('incomplete arrivals are edited by ID and retain existing fields and quantity', async () => {
   const h = harness();
-  h.state.rows = [record(entry(), { goods: '', goods_memo: '', Is_Yb: 0 })];
-  h.adapter.submit = async candidate => {
+  h.state.rows = [record(entry(), { goods: '原有品名', goods_memo: '', Number: '6', Is_Yb: 0 })];
+  h.adapter.edit = async candidate => {
     h.state.sent.push(candidate.trackingNumber);
-    h.state.rows[0] = record(candidate, { id: h.state.rows[0].id });
-    return [{ State: true }];
+    assert.equal(candidate.goods, '原有品名');
+    assert.equal(candidate.number, 6);
+    assert.deepEqual(core.editPayload(candidate), {
+      id: '1001', goods_id: 0, goods: '原有品名', goods_memo: core.wireText(candidate.memo),
+      kd_billcode: TRACKING, immediately: 0, goodstype: '', Number: 6,
+    });
+    h.state.rows[0] = record(candidate);
+    return { State: 'True' };
   };
   const result = await h.run(newJob());
   assert.equal(result.entries[0].status, 'verified');
-  assert.equal(h.state.rows[0].id, 'synthetic-pack-id');
+  assert.equal(h.state.rows[0].id, '1001');
   assert.deepEqual(h.state.sent, [TRACKING]);
+});
+
+test('an edit cannot be verified against a different package ID, even after importing results', async () => {
+  const h = harness();
+  h.state.rows = [record(entry(), { goods: '', goods_memo: '', Is_Yb: 0 })];
+  h.adapter.edit = async candidate => {
+    h.state.rows[0] = record(candidate, { id: '1002' });
+    return { State: true };
+  };
+  const result = await h.run(newJob());
+  assert.equal(result.entries[0].status, 'unknown');
+  const resumed = core.normalizeInput(result).entries[0];
+  assert.equal(resumed.attempt.packId, '1001');
+  assert.equal((await h.run(newJob([resumed]))).entries[0].status, 'unknown');
 });
 
 test('timeout after server acceptance is recovered by readback without a second POST', async () => {

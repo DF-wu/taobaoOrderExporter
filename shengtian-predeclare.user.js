@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聖天集運 JSON 包裹預報
 // @namespace    https://github.com/DF-wu/taobaoOrderExporter
-// @version      1.1.0
+// @version      1.2.0
 // @description  JSON 包裹預報、自訂 OpenAI 相容 LLM 建議品名與備註、回讀驗證及例外續跑。
 // @match        http://member.stjh168.com/Member/MyPack*
 // @match        https://member.stjh168.com/Member/MyPack*
@@ -19,7 +19,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const HOST_ID = 'shengtian-json-predeclare';
   const FINAL = ['verified', 'existing', 'historical', 'rejected', 'not_found', 'duplicate'];
   const UNCERTAIN = ['submitting', 'unknown'];
@@ -46,7 +46,7 @@
     const errors = [];
     try { normalizeTracking(entry.trackingNumber); } catch (error) { errors.push(error.message); }
     if (!string(entry.goods)) errors.push('請填寫已核對的簡短貨物品名。');
-    if (typeof entry.memo !== 'string') errors.push('備註必須是字串。');
+    if (!string(entry.memo)) errors.push('請填寫已核對的備註。');
     if (!Number.isSafeInteger(entry.number) || entry.number < 1 || entry.number > 2147483647) errors.push('數量必須是正整數（預設一個包裹為 1）。');
     if (/[\u0000-\u001f<>]/.test((entry.goods || '') + (entry.memo || ''))) errors.push('品名／備註包含控制字元或尖括號，請修正。');
     if (entry.conflict) errors.push('同一單號有不同申報內容，請核對並勾選採用此列內容。');
@@ -83,7 +83,8 @@
         const sent = raw?.attempt || raw;
         if (normalizeTracking(sent.trackingNumber) !== trackingNumber || typeof sent.goods !== 'string' || typeof sent.memo !== 'string' || !Number.isSafeInteger(sent.number) || sent.number < 1) fail('INPUT', '未知提交紀錄缺少完整原始內容，不能當成新計畫匯入。');
         Object.assign(entry, { goods: sent.goods, memo: sent.memo, number: sent.number,
-          attempt: { trackingNumber, goods: sent.goods, memo: sent.memo, number: sent.number },
+          attempt: { trackingNumber, goods: sent.goods, memo: sent.memo, number: sent.number,
+            ...(sent.packId == null ? {} : { packId: sent.packId }) },
           needsReview: false, reviewed: true, status: 'unknown', message: '匯入的未知提交必須先只讀回查，不能直接重送。' });
       }
       const key = invalid ? `invalid:${index}` : trackingNumber;
@@ -153,9 +154,13 @@
 
   function parseAddResponse(value) {
     if (!Array.isArray(value) || value.length !== 1 || !value[0] || typeof value[0] !== 'object') return { kind: 'unknown', message: '預報回應不是單筆結果陣列。' };
-    const row = value[0], message = typeof row.MsgText === 'string' ? row.MsgText : '';
-    if (row.State === true || row.State === 1 || row.State === '1' || row.State === 'true') return { kind: 'success', message };
-    if (![false, 0, '0', 'false'].includes(row.State)) return { kind: 'unknown', message: message || '預報回應缺少明確成功／失敗狀態。' };
+    return parseWriteResponse(value[0]);
+  }
+  function parseWriteResponse(row) {
+    const message = typeof row?.MsgText === 'string' ? row.MsgText : '';
+    const state = typeof row?.State === 'string' ? row.State.toLowerCase() : row?.State;
+    if ([true, 1, '1', 'true'].includes(state)) return { kind: 'success', message };
+    if (![false, 0, '0', 'false'].includes(state)) return { kind: 'unknown', message: message || '回應缺少明確成功／失敗狀態。' };
     if (/登入|登录|登錄|login|session|驗證碼|验证码/i.test(message)) return { kind: 'auth', message };
     if (/查無|查无|查不到|不存在|未找到|not.?found/i.test(message)) return { kind: 'not_found', message };
     if (/重複|重复|已預報|已预报|已登記|已登记|已存在|已经|已經|duplicate/i.test(message)) return { kind: 'duplicate', message };
@@ -168,6 +173,7 @@
   }
   function matchesSaved(entry, pack) {
     return !!pack && string(pack.kdBillCode).toUpperCase() === entry.trackingNumber &&
+      (entry.packId == null || String(pack.id) === String(entry.packId)) &&
       (pack.goods ?? '') === entry.goods && (pack.goods_memo ?? '') === entry.memo && Number(pack.Number) === entry.number;
   }
   function classifyCurrent(entry, rows, history) {
@@ -175,8 +181,15 @@
     if (matches.length > 1) return { status: 'duplicate_server', message: '服務端有多筆相同單號，停止並保留所有原紀錄。' };
     if (matches.length) {
       const row = matches[0];
-      if (row.Is_Yb === 1 || row.Is_Yb === '1' || row.Is_Yb === true || string(row.goods) || string(row.goods_memo)) return { status: 'existing', message: '目前包裹已有預報或已填寫內容，保留原資料。', before: row };
-      if ([0, '0', false].includes(row.Is_Yb)) return { status: 'blank-arrived', message: '已自動入庫但尚無品名／備註，可以補報。', before: row };
+      if (string(row.goods) && string(row.goods_memo)) return { status: 'existing', message: '目前包裹的品名與備註都已填寫。', before: row };
+      if ([0, '0', false, 1, '1', true].includes(row.Is_Yb)) {
+        if (!/^[1-9]\d*$/.test(String(row.id)) || !/^[1-9]\d*$/.test(String(row.Number)) ||
+          !Number.isSafeInteger(Number(row.Number)) || Number(row.Number) > 2147483647 ||
+          ![null, undefined, '', 0, '0'].includes(row.goods_id)) {
+          return { status: 'unknown', message: '既有包裹的 ID、數量或貨物類型需要人工核對。', before: row };
+        }
+        return { status: 'incomplete', message: '品名或備註缺漏，將在同一筆包裹補齊並沿用原數量。', before: row };
+      }
       return { status: 'unknown', message: '目前包裹的預報狀態未知，不自動修改。', before: row };
     }
     if (!history || !Number.isSafeInteger(history.count) || history.count < 0) return { status: 'unknown', message: '尚未完成歷史集運訂單核對。' };
@@ -188,6 +201,20 @@
     return [{ kdBillcode: normalizeTracking(entry.trackingNumber), Number: entry.number, Goods: wireText(entry.goods),
       Goodsid: 0, Goods_meno: wireText(entry.memo), Immediatrly: 0, GoodsType: '' }];
   }
+  function editPayload(entry) {
+    return {
+      id: entry.packId, goods_id: 0, goods: wireText(entry.goods), goods_memo: wireText(entry.memo),
+      kd_billcode: entry.trackingNumber, immediately: 0, goodstype: '', Number: entry.number
+    };
+  }
+  function declarationToWrite(entry, before) {
+    const { trackingNumber, goods, memo, number } = entry;
+    if (!before) return { trackingNumber, goods, memo, number };
+    return {
+      trackingNumber, packId: before.id, goods: string(before.goods) ? before.goods : goods,
+      memo: string(before.goods_memo) ? before.goods_memo : memo, number: Number(before.Number)
+    };
+  }
   function wait(ms, signal) {
     return new Promise((resolve, reject) => {
       const stop = () => { clearTimeout(timer); signal?.removeEventListener('abort', stop); reject(new PredeclareError('CANCELLED', '已停止；已送出的請求仍會先回讀核對。')); };
@@ -197,7 +224,7 @@
   }
   function unchanged(before, after) {
     if (!before || !after) return !before && !after;
-    return ['id', 'goods', 'goods_memo', 'Number', 'Is_Yb'].every(key => String(before[key] ?? '') === String(after[key] ?? ''));
+    return ['id', 'goods', 'goods_memo', 'Number', 'Is_Yb', 'goods_id'].every(key => String(before[key] ?? '') === String(after[key] ?? ''));
   }
 
   /** 非冪等寫入：先記錄 submitting；送出後即使逾時／停止，也先查服務端，絕不盲目重送。 */
@@ -211,28 +238,36 @@
       if (UNCERTAIN.includes(entry.status)) {
         const matches = currentMatches(await adapter.current(), entry.trackingNumber);
         if (matches.length === 1 && matchesSaved(entry.attempt || entry, matches[0])) {
+          Object.assign(entry, entry.attempt);
           entry.status = 'verified'; entry.message = '已從服務端核對先前送出的結果，沒有再次提交。';
           await save(job, entry); report(entry); continue;
         }
         entry.status = 'unknown'; entry.message = '先前提交結果仍不明，請先人工核對；本工具不會再次送出。';
         job.pausedReason = entry.message; await save(job, entry); report(entry); break;
       }
-      const invalid = validateEntry(entry);
-      if (invalid.length) { entry.status = entry.conflict ? 'conflict' : 'invalid'; entry.message = invalid.join(' '); await save(job, entry); report(entry); continue; }
+      try { normalizeTracking(entry.trackingNumber); }
+      catch (error) { entry.status = 'invalid'; entry.message = error.message; await save(job, entry); report(entry); continue; }
       await pause(intervalMs, signal);
       const rows = await adapter.current(); account();
       const history = currentMatches(rows, entry.trackingNumber).length ? undefined : await adapter.history(entry.trackingNumber);
       const check = classifyCurrent(entry, rows, history);
       Object.assign(entry, check); await save(job, entry); report(entry);
       if (['unknown', 'duplicate_server'].includes(check.status)) { job.pausedReason = check.message; break; }
-      if (!['ready', 'blank-arrived'].includes(check.status)) continue;
+      if (!['ready', 'incomplete'].includes(check.status)) continue;
+      const attempt = declarationToWrite(entry, check.before);
+      const invalid = validateEntry({ ...entry, ...attempt });
+      if (invalid.length) { entry.status = entry.conflict ? 'conflict' : 'invalid'; entry.message = invalid.join(' '); await save(job, entry); report(entry); continue; }
       if (signal?.aborted) { job.pausedReason = '已停止。'; break; }
       account();
-      entry.attempt = { trackingNumber: entry.trackingNumber, goods: entry.goods, memo: entry.memo, number: entry.number };
+      entry.attempt = attempt;
       entry.status = 'submitting'; entry.message = '正在預報，接著會從服務端回讀核對。';
       await save(job, entry); report(entry);
       let response;
-      try { response = parseAddResponse(await adapter.submit(entry)); }
+      try {
+        response = attempt.packId == null
+          ? parseAddResponse(await adapter.submit(attempt))
+          : parseWriteResponse(await adapter.edit(attempt));
+      }
       catch (error) { response = { kind: 'unknown', message: error.message }; }
       entry.response = response; entry.attemptedAt = new Date().toISOString();
       try {
@@ -240,6 +275,7 @@
         // 不使用使用者的停止 signal 中止這次回讀；停止只能阻止下一筆寫入。
         const matches = currentMatches(await adapter.current(), entry.trackingNumber); account();
         if (matches.length === 1 && matchesSaved(entry.attempt, matches[0])) {
+          Object.assign(entry, entry.attempt);
           entry.status = 'verified'; entry.message = '已回讀確認品名、完整備註及數量。'; entry.savedId = matches[0].id;
         } else if (response.kind !== 'success' && response.kind !== 'unknown' && response.kind !== 'auth' && matches.length <= 1 && unchanged(check.before, matches[0] || null)) {
           entry.status = response.kind === 'not_found' ? 'not_found' : response.kind === 'duplicate' ? 'duplicate' : 'rejected';
@@ -409,13 +445,13 @@
     await save(job); return job;
   }
   const core = { VERSION, PredeclareError, normalizeTracking, wireText, normalizeInput, validateEntry,
-    parseAddResponse, classifyCurrent, matchesSaved, payload, processQueue, normalizeLLMSettings,
+    parseAddResponse, parseWriteResponse, classifyCurrent, matchesSaved, payload, editPayload, processQueue, normalizeLLMSettings,
     buildLLMRequest, parseLLMSuggestion, applyLLMSuggestion, requestLLM, generateLLMSuggestions };
   if (typeof module === 'object' && module.exports) { module.exports = core; return; }
 
   if (location.hostname !== 'member.stjh168.com' || location.pathname.toLowerCase() !== '/member/mypack' || window.top !== window || document.getElementById(HOST_ID)) return;
   const LABELS = { pending: '待檢查', invalid: '待修正／核對', conflict: '輸入衝突', ready: '可新增',
-    'blank-arrived': '可補報', existing: '已有資料', historical: '歷史已集運', duplicate_server: '服務端重複',
+    incomplete: '缺欄可補填', existing: '欄位齊全', historical: '歷史已集運', duplicate_server: '服務端重複',
     submitting: '正在提交', verified: '已回讀驗證', rejected: '網站拒絕', not_found: '網站回報查無', duplicate: '網站回報重複', unknown: '結果待核對' };
   let db, job, active, activeOperation, accountId, lastRequestAt = 0, leaseLost = false;
   let llmSettings = null, llmKey = '', llmKeyEndpoint = '';
@@ -618,12 +654,17 @@
       if (!/^\d+$/.test(field.value) || !Number.isSafeInteger(count) || count < 0 || (count > 0 && !rows.length) || (count === 0 && rows.length)) fail('SCHEMA', '歷史訂單筆數與資料不一致，已停止。');
       return { count };
     },
-    async submit(entry) {
-      // 使用官方 API，完全不執行頁面的同步 AJAX／alert／reload，也不改寫全站 alert。
-      const raw = await request('/Member/AddBillcode', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' }, body: new URLSearchParams({ datas: JSON.stringify(payload(entry)) }).toString() });
-      try { return JSON.parse(raw); } catch { fail('SCHEMA', '預報回應不是 JSON；結果須回查。'); }
-    }
+    submit: entry => postDeclaration('/Member/AddBillcode', { datas: JSON.stringify(payload(entry)) }),
+    edit: entry => postDeclaration('/Member/EditPackByID', editPayload(entry))
   };
+  async function postDeclaration(path, fields) {
+    const raw = await request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: new URLSearchParams(fields).toString()
+    });
+    try { return JSON.parse(raw); } catch { fail('SCHEMA', '包裹寫入回應不是 JSON，請先回查結果。'); }
+  }
   async function importJson() {
     const parsed = normalizeInput(ui.json.value);
     if (parsed.accountMarker && parsed.accountMarker !== accountId) fail('ACCOUNT_CHANGED', 'JSON 計畫指定的會員與目前帳號不符。');
@@ -642,13 +683,14 @@
       if (entry.attempt && UNCERTAIN.includes(entry.status)) {
         const matches = currentMatches(rows, entry.trackingNumber);
         entry.status = matches.length === 1 && matchesSaved(entry.attempt, matches[0]) ? 'verified' : 'unknown';
+        if (entry.status === 'verified') Object.assign(entry, entry.attempt);
         entry.message = entry.status === 'verified' ? '已回讀核對先前提交，沒有重送。' : '提交結果仍不明，請人工核對；不會重送。';
       } else {
         try { normalizeTracking(entry.trackingNumber); } catch { continue; }
         const history = currentMatches(rows, entry.trackingNumber).length ? undefined : await adapter.history(entry.trackingNumber);
         Object.assign(entry, classifyCurrent(entry, rows, history));
-        const errors = validateEntry(entry);
-        if (errors.length && ['ready', 'blank-arrived'].includes(entry.status)) { entry.status = entry.conflict ? 'conflict' : 'invalid'; entry.message = errors.join(' '); }
+        const errors = validateEntry({ ...entry, ...declarationToWrite(entry, entry.before) });
+        if (errors.length && ['ready', 'incomplete'].includes(entry.status)) { entry.status = entry.conflict ? 'conflict' : 'invalid'; entry.message = errors.join(' '); }
       }
       await save(job, entry); updateRow(entry);
     }
@@ -737,7 +779,7 @@
           ui.llmState.textContent = llmKey ? '已載入設定與腳本管理器中的金鑰；金鑰不顯示在欄位。' : '已載入設定；目前不帶 API Key。';
         } else ui.llmState.textContent = '請設定自己的 API 網址與模型。金鑰預設只在本頁保留。';
       } catch (error) { ui.llmState.textContent = `設定載入失敗：${safeLLMError(error)}`; }
-    } else ui.llmState.textContent = '請從安裝連結更新到 1.1.0 並接受腳本權限，才可設定跨網域 LLM。直接注入模式不保存金鑰。';
+    } else ui.llmState.textContent = '請從安裝連結更新到目前版本並接受腳本權限，才可設定跨網域 LLM。直接注入模式不保存金鑰。';
     shadow.getElementById('save').onclick = async event => {
       if (!event.isTrusted || active || !gmAvailable) return;
       const suppliedKey = fields.key.value.trim();
@@ -803,6 +845,12 @@
       ui.json.value = await file.text(); status('檔案已讀入，請按「匯入 JSON」。'); } catch (error) { status(error.message); } };
     try {
       accountId = account(); supportedForm(); await openStore(); job = await read('job');
+      for (const entry of job?.entries ?? []) {
+        if (entry.status === 'existing' && entry.before && (!string(entry.before.goods) || !string(entry.before.goods_memo))) {
+          entry.status = 'pending';
+          entry.message = '重新核對既有包裹的品名和備註。';
+        }
+      }
       await setupLLMSettings(shadow.getElementById('llm-settings-host'));
       shadow.getElementById('account').textContent = ` 會員 ${accountId}`;
       render();
